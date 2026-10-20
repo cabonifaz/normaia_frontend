@@ -29,6 +29,8 @@ export default defineConfig({
       VITE_PAYLOAD_ENCRYPTION: 'required',
       VITE_PAYLOAD_PUBLIC_KEY: publicPem.replace(/\n/g, '\n'),
       VITE_PAYLOAD_KEY_ID: E2E_KID,
+      // Explícito: process.env tiene prioridad sobre un .env.local de desarrollo con mocks activos.
+      VITE_USE_MOCKS: 'false',
     },
   },
 });

@@ -11,9 +11,13 @@ const EnvSchema = z
     VITE_PAYLOAD_PUBLIC_KEY: z.string().optional().default(''),
     VITE_PAYLOAD_KEY_ID: z.string().optional().default(''),
     VITE_HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(15000),
+    VITE_USE_MOCKS: z.enum(['true', 'false']).default('false'),
     PROD: z.boolean(),
   })
   .superRefine((env, ctx) => {
+    if (env.PROD && env.VITE_USE_MOCKS === 'true') {
+      ctx.addIssue({ code: 'custom', path: ['VITE_USE_MOCKS'], message: 'Los adaptadores mock solo se permiten en desarrollo.' });
+    }
     if (env.PROD && !env.VITE_API_BASE_URL.startsWith('https://')) {
       ctx.addIssue({ code: 'custom', path: ['VITE_API_BASE_URL'], message: 'En producción el API debe servirse por HTTPS.' });
     }
@@ -37,10 +41,12 @@ function load() {
     apiBaseUrl: e.VITE_API_BASE_URL.replace(/\/+$/, ''),
     encryption: Object.freeze({
       required: e.VITE_PAYLOAD_ENCRYPTION === 'required',
-      publicKeyPem: e.VITE_PAYLOAD_PUBLIC_KEY.replace(/\n/g, '\n'),
+      // .env guarda el PEM en una línea con "\n" escapados
+      publicKeyPem: e.VITE_PAYLOAD_PUBLIC_KEY.replace(/\\n/g, '\n'),
       keyId: e.VITE_PAYLOAD_KEY_ID,
     }),
     httpTimeoutMs: e.VITE_HTTP_TIMEOUT_MS,
+    useMocks: e.VITE_USE_MOCKS === 'true',
   });
 }
 
