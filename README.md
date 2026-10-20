@@ -64,8 +64,8 @@ En producción se recomienda lo mismo con nginx (`location /api/ { proxy_pass �
 | 1 | `GET /company/get_companies_login` | Público, devuelve `SECRET_KEY` de todas las empresas | **Crítico:** protegerlo o eliminarlo |
 | 2 | `ref` en `/auth/login` | Secret key de empresa obligatoria | Un valor en el bundle es público: resolver la empresa en servidor |
 | 3 | Sesión | JWT en el cuerpo (el front lo guarda solo en memoria) | Cookie `HttpOnly; Secure; SameSite=Strict` |
-| 4 | Maestros 23/24 en el registro | Exigen JWT de login | Aceptar RegistroBearer o exponer endpoint público de solo lectura |
-| 5 | Respuesta de `VALIDAR` | Campo del RegistroBearer no documentado | Documentar en el Swagger |
+| 4 | Maestros 23/24 en el registro | **Bloqueante, verificado 2026-10-20:** con el RegistroBearer responden 401 "Token inválido" | Aceptar RegistroBearer o exponer endpoint público de solo lectura |
+| 5 | Respuesta de `VALIDAR` | Real: `{ esValido, tokenRegistro, expiraEnSegundos: 900 }` (no documentado) | Documentar en el Swagger. El front ya lo usa y maneja el vencimiento de 15 min |
 | 6 | Recuperación de contraseña | No existe | Endpoints solicitar código / restablecer |
 | 7 | CORS | Origen del front no permitido; `Retry-After` no expuesto | Lista blanca + `Access-Control-Expose-Headers: Retry-After, X-Request-Id` |
 | 8 | Cifrado de campos (JWE) | Espera claves en claro | Descifrar JWE RSA-OAEP-256/A256GCM (el front ya lo soporta) |

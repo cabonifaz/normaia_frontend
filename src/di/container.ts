@@ -17,7 +17,10 @@ export function createContainer(hooks: { onUnauthorized?: () => void } = {}): Ap
   const http = createHttpClient(
     { baseUrl: env.apiBaseUrl, timeoutMs: env.httpTimeoutMs },
     {
+      // Un 401 solo es "sesión expirada" si había sesión. Durante el registro (sin login) un 401 es
+      // un error del endpoint y se informa en su pantalla, sin expulsar al usuario del flujo.
       onUnauthorized: () => {
+        if (!session.session()) return;
         session.clear();
         hooks.onUnauthorized?.();
       },

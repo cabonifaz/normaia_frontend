@@ -46,6 +46,7 @@ const GENERIC: Record<AppErrorKind, string> = {
 /** Mensajes por código de negocio, válidos en cualquier pantalla. */
 const BY_CODE: Partial<Record<string, string>> = {
   DOMINIO_NO_PERMITIDO: 'Este correo no pertenece a un dominio habilitado. Usa tu correo institucional o corporativo.',
+  REGISTRO_EXPIRADO: 'Tu verificación de correo venció (dura 15 minutos). Vuelve a solicitar un código para continuar.',
   RECUPERACION_NO_DISPONIBLE: 'La recuperación de contraseña aún no está disponible. Comunícate con soporte para restablecer tu acceso.',
 };
 

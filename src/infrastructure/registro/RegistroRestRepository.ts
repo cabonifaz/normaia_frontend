@@ -19,14 +19,14 @@ const RESEND_AFTER = 30;
 
 const DominioSchema = envelope(z.object({ dominio: z.string().max(253).optional(), esValido: z.boolean() }));
 
-/** PENDIENTE de confirmar con backend: nombre del campo del RegistroBearer en la respuesta de VALIDAR. */
-function extractRegistrationToken(body: z.infer<typeof AnyEnvelope>): string {
-  const data = (body.data ?? {}) as Record<string, unknown>;
-  const candidates = [data.token, data.tokenRegistro, data.registroToken, data.access_token, (body as Record<string, unknown>).token];
-  const token = candidates.find((c): c is string => typeof c === 'string' && c.length > 0);
-  if (!token) throw new AppError('contract', 200, 'local');
-  return token;
-}
+/** Respuesta real de accion=VALIDAR (verificada contra el backend): { esValido, tokenRegistro, expiraEnSegundos }. */
+const ValidarSchema = envelope(
+  z.object({
+    esValido: z.boolean(),
+    tokenRegistro: z.string().min(16).max(8192).optional(),
+    expiraEnSegundos: z.number().int().min(0).max(86400).optional(),
+  }),
+);
 
 export function createRegistroRestRepository(http: HttpClient, session: SessionStore): RegistroRepository {
   const enviarCodigo = async (correo: string) => {
@@ -44,13 +44,14 @@ export function createRegistroRestRepository(http: HttpClient, session: SessionS
     reenviarCodigo: (correo) => enviarCodigo(correo),
 
     async verificarCodigo(correo, codigo) {
-      const body = await http(endpoints.auth.verificacionCodigo, {
+      const { data } = await http(endpoints.auth.verificacionCodigo, {
         method: 'POST',
         body: { correo, accion: 'VALIDAR', codigo },
-        schema: AnyEnvelope,
+        schema: ValidarSchema,
         notifyUnauthorized: false,
       });
-      const token = extractRegistrationToken(body);
+      if (!data.esValido || !data.tokenRegistro) throw new AppError('validation', 200, 'local', 'OTP_INVALID');
+      const token = data.tokenRegistro;
       // Disponible para los maestros del paso 3 (requieren Bearer y aún no hay sesión).
       session.setRegistration(token);
       return token;
@@ -60,22 +61,28 @@ export function createRegistroRestRepository(http: HttpClient, session: SessionS
       const idFormacion = Number(cuenta.formacion);
       const idInstitucionEstudios = Number(cuenta.institucion);
       if (!Number.isInteger(idFormacion) || !Number.isInteger(idInstitucionEstudios)) throw new AppError('validation', 0, 'local');
-      await http(endpoints.auth.crearUsuario, {
-        method: 'POST',
-        bearer: registrationToken,
-        notifyUnauthorized: false,
-        schema: AnyEnvelope,
-        body: {
-          nombres: cuenta.nombres,
-          apellidos: cuenta.apellidos,
-          idFormacion,
-          fechaNacimiento: cuenta.fechaNacimiento,
-          idInstitucionEstudios,
-          clave: cuenta.passwordProtegida,
-          confirmacionClave: cuenta.passwordProtegida,
-          aceptaTerminos: cuenta.aceptaTerminos,
-        },
-      });
+      try {
+        await http(endpoints.auth.crearUsuario, {
+          method: 'POST',
+          bearer: registrationToken,
+          notifyUnauthorized: false,
+          schema: AnyEnvelope,
+          body: {
+            nombres: cuenta.nombres,
+            apellidos: cuenta.apellidos,
+            idFormacion,
+            fechaNacimiento: cuenta.fechaNacimiento,
+            idInstitucionEstudios,
+            clave: cuenta.passwordProtegida,
+            confirmacionClave: cuenta.passwordProtegida,
+            aceptaTerminos: cuenta.aceptaTerminos,
+          },
+        });
+      } catch (err) {
+        // El RegistroBearer vence a los 15 min (expiraEnSegundos=900): mensaje propio y reinicio del flujo.
+        if (err instanceof AppError && err.kind === 'unauthorized') throw new AppError('unauthorized', err.status, err.requestId, 'REGISTRO_EXPIRADO');
+        throw err;
+      }
       session.setRegistration(null); // el token de registro es de un solo uso
     },
   };

@@ -2,7 +2,7 @@ import { useForm, useStore } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useRef } from 'react';
-import { userMessage } from '@/application/errors';
+import { AppError, userMessage } from '@/application/errors';
 import { codigosPermitidos, MAESTRO } from '@/domain/maestros/maestro';
 import {
   validateProfile,
@@ -32,9 +32,11 @@ const EMPTY: ProfileInput = {
 interface ProfileStepProps {
   registrationToken: string;
   onDone: () => void;
+  /** La verificación del correo venció: volver a pedir código conservando el correo. */
+  onExpired: () => void;
 }
 
-export function ProfileStep({ registrationToken, onDone }: ProfileStepProps) {
+export function ProfileStep({ registrationToken, onDone, onExpired }: ProfileStepProps) {
   const { registro } = useDependencies();
   const formaciones = useMaestro(MAESTRO.FORMACION);
   const instituciones = useMaestro(MAESTRO.INSTITUCION);
@@ -79,6 +81,7 @@ export function ProfileStep({ registrationToken, onDone }: ProfileStepProps) {
   const submitting = useStore(form.store, (s) => s.isSubmitting);
   const formErrors = useStore(form.store, (s) => (s.errorMap.onSubmit as string[] | undefined) ?? []);
   const errorList = crear.isError ? [userMessage(crear.error)] : formErrors;
+  const expired = crear.error instanceof AppError && crear.error.code === 'REGISTRO_EXPIRADO';
 
   return (
     <section className="panel" data-panel="3" aria-labelledby="p3">
@@ -193,7 +196,11 @@ export function ProfileStep({ registrationToken, onDone }: ProfileStepProps) {
             <p className="error" key={t}>{t}</p>
           ))}
         </div>
-        <button className="btn" type="submit" disabled={submitting || maestrosFailed} aria-busy={submitting}>Crear cuenta</button>
+        {expired ? (
+          <button className="btn" type="button" onClick={onExpired}>Solicitar un código nuevo</button>
+        ) : (
+          <button className="btn" type="submit" disabled={submitting || maestrosFailed} aria-busy={submitting}>Crear cuenta</button>
+        )}
       </form>
     </section>
   );

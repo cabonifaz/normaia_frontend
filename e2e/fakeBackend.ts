@@ -27,6 +27,8 @@ interface Options {
   failMaestros?: boolean;
   /** Dominio que el backend rechaza en validar-correo. */
   blockedDomain?: string;
+  /** Simula que el RegistroBearer venció (15 min) al crear la cuenta. */
+  expiredRegistration?: boolean;
 }
 
 export const E2E_PASSWORD = 'Norma2026';
@@ -90,14 +92,15 @@ export async function fakeBackend(page: Page, opts: Options = {}) {
         return json(route, 200, ok({ dominio, esValido: dominio !== (opts.blockedDomain ?? 'gmail.com') }));
       }
       case '/auth/verificacion-codigo': {
-        if (body?.accion === 'REGISTRAR') return json(route, 200, ok({ enviado: true }));
+        // Forma real verificada contra el backend: REGISTRAR responde solo { result }
+        if (body?.accion === 'REGISTRAR') return json(route, 200, { result: { idTipoMensaje: 2, mensaje: 'Se realizó el registro del código correctamente' } });
         const code = decryptJwe(String(body?.codigo)).plaintext;
         return code === validCode
-          ? json(route, 200, ok({ token: REG_TOKEN }))
+          ? json(route, 200, ok({ esValido: true, tokenRegistro: REG_TOKEN, expiraEnSegundos: 900 }))
           : json(route, 400, fail(400, 'Código inválido para usuario id 42 (SP_VERIFICACION)'));
       }
       case '/auth/crear-usuario':
-        if (bearer !== REG_TOKEN) return json(route, 401, fail(401, 'Token de registro inválido'));
+        if (bearer !== REG_TOKEN || opts.expiredRegistration) return json(route, 401, fail(401, 'Token de registro inválido'));
         return json(route, 201, ok({ idUsuario: 42 }));
       case '/auth/login': {
         const clave = decryptJwe(String(body?.clave_acceso)).plaintext;

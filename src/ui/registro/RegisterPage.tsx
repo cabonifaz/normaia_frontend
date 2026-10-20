@@ -79,6 +79,12 @@ export function RegisterPage() {
               setChallenge(null);
               setStep(4);
             }}
+            onExpired={() => {
+              setRegistrationToken(null);
+              setChallenge(null);
+              setCameBack(true);
+              setStep(1);
+            }}
           />
         )}
 

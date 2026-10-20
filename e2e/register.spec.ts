@@ -118,6 +118,31 @@ test.describe('registro', () => {
     expect(captured.some((c) => c.path === '/auth/verificacion-codigo')).toBe(false);
   });
 
+  test('verificación vencida (15 min): mensaje claro y vuelta a pedir código con el correo conservado', async ({ page }) => {
+    await fakeBackend(page, { expiredRegistration: true });
+    await page.goto('/registro');
+    await page.getByLabel('Correo electrónico').fill('ana@correo.com');
+    await page.getByRole('button', { name: 'Enviar código' }).click();
+    await page.getByLabel('Dígito 1').pressSequentially('1234');
+    await page.getByRole('button', { name: 'Verificar correo' }).click();
+    await page.getByLabel('Nombres').fill('Ana');
+    await page.getByLabel('Apellidos').fill('Quispe');
+    await page.locator('label.choice').first().click();
+    await page.getByLabel('Fecha de nacimiento').fill('1995-02-03');
+    const combo = page.getByRole('combobox', { name: 'Institución de estudios' });
+    await combo.fill('lima');
+    await combo.press('Enter');
+    await page.getByLabel('Contraseña', { exact: true }).fill('Segura2026');
+    await page.getByLabel('Confirma tu contraseña').fill('Segura2026');
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+    await expect(page.locator('#f3Errors')).toContainText('Tu verificación de correo venció');
+    await expect(page).toHaveURL(/\/registro$/); // no expulsa al login
+    await page.getByRole('button', { name: 'Solicitar un código nuevo' }).click();
+    await expect(page.getByRole('heading', { name: 'Crea tu cuenta' })).toBeVisible();
+    await expect(page.getByLabel('Correo electrónico')).toHaveValue('ana@correo.com');
+  });
+
   test('perfil vacío muestra todos los errores del prototipo', async ({ page }) => {
     await fakeBackend(page);
     await page.goto('/registro');
