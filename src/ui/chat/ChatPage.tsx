@@ -96,6 +96,17 @@ export function ChatPage() {
   const vacio = chatId === null && !borrador && !consulta.activo;
   const lista = [...mensajes.mensajes, ...(borrador ? [borrador.usuario] : [])];
   const enviar = (texto: string, archivos: Parameters<typeof consulta.enviar>[1]) => void consulta.enviar(texto, archivos);
+  const composerEl = (variante: 'inline' | 'dock') => (
+    <Composer
+      ref={composer}
+      variante={variante}
+      disabled={false}
+      enviando={consulta.activo}
+      placeholder="Pregunta sobre el Reglamento Nacional de Edificaciones…"
+      onEnviar={enviar}
+      onDetener={consulta.detener}
+    />
+  );
 
   return (
     <div className="app" data-side={panel ? 'open' : 'closed'}>
@@ -108,6 +119,7 @@ export function ChatPage() {
         bloqueado={consulta.activo}
         onSeleccionar={(id) => abrirChat(id)}
         onNuevo={() => abrirChat(null)}
+        onInicio={() => abrirChat(null)}
         onCerrar={() => {
           setPanel(false);
           menuBtn.current?.focus();
@@ -140,7 +152,9 @@ export function ChatPage() {
 
         {vacio ? (
           <div className="thread">
-            <Welcome nombre={usuario?.nombres ?? ''} disabled={consulta.activo} onPregunta={(t) => enviar(t, [])} />
+            <Welcome nombre={usuario?.nombres ?? ''} disabled={consulta.activo} onPregunta={(t) => enviar(t, [])}>
+              {composerEl('inline')}
+            </Welcome>
           </div>
         ) : mensajes.isError ? (
           <div className="app-state">
@@ -178,14 +192,7 @@ export function ChatPage() {
 
         <span className="sr-only" aria-live="polite">{consulta.activo ? 'Norma IA está respondiendo.' : ''}</span>
 
-        <Composer
-          ref={composer}
-          disabled={false}
-          enviando={consulta.activo}
-          placeholder="Pregunta sobre el Reglamento Nacional de Edificaciones…"
-          onEnviar={enviar}
-          onDetener={consulta.detener}
-        />
+        {!vacio && composerEl('dock')}
       </main>
     </div>
   );

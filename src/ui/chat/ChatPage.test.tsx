@@ -28,9 +28,7 @@ beforeAll(() => {
 });
 
 function logueado() {
-  const deps = fakeDeps();
-  deps.auth.haySesion.mockReturnValue(true);
-  return deps;
+  return fakeDeps({ conSesion: true });
 }
 
 describe('chat del usuario final', () => {
@@ -149,6 +147,36 @@ describe('chat del usuario final', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/ingresar'));
     expect(deps.chat.cerrarSesion).toHaveBeenCalledOnce();
     expect(await screen.findByRole('status')).toHaveTextContent('Cerraste sesión correctamente.');
+  });
+
+  it('el home integra el compositor antes de las sugerencias (no las tapa)', async () => {
+    renderApp('/app', logueado());
+    const input = await screen.findByLabelText('Escribe tu consulta');
+    const lista = screen.getByRole('list', { name: 'O empieza con una consulta frecuente' });
+    expect(input.compareDocumentPosition(lista) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(input.closest('.welcome')).not.toBeNull();
+    expect(document.querySelectorAll('#composer-input')).toHaveLength(1);
+  });
+
+  it('el logo vuelve al home del chat sin salir de la sesión', async () => {
+    const user = userEvent.setup();
+    const deps = logueado();
+    const { router } = renderApp('/app', deps);
+    await user.click(await screen.findByRole('button', { name: 'Salidas de evacuación' }));
+    expect(await screen.findByText('¿Cuántas salidas?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Norma IA, inicio de consultas' }));
+    expect(await screen.findByRole('heading', { name: /Hola, Ana\./ })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/app');
+    expect(deps.chat.cerrarSesion).not.toHaveBeenCalled();
+  });
+
+  it('con sesión, la landing ofrece volver a las consultas y /ingresar redirige al chat', async () => {
+    const deps = logueado();
+    const { router } = renderApp('/', deps);
+    expect(await screen.findByRole('link', { name: 'Ir a mis consultas' })).toHaveAttribute('href', '/app');
+    expect(screen.queryByRole('link', { name: 'Ya tengo cuenta' })).not.toBeInTheDocument();
+    await router.navigate({ to: '/ingresar' });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app'));
   });
 
   it('usuario sin área asignada: estado claro, sin chat', async () => {

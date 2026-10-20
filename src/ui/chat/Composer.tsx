@@ -3,6 +3,8 @@ import type { ArchivoAdjunto } from '@/application/ports/ChatRepository';
 import { firmaImagenValida, LIMITES, MSG_CHAT, validarAdjuntos, validarMensaje } from '@/domain/chat/chat';
 
 interface ComposerProps {
+  /** inline: dentro del home (no tapa contenido); dock: fijo al pie de la conversación. */
+  variante?: 'inline' | 'dock';
   disabled: boolean;
   enviando: boolean;
   placeholder: string;
@@ -25,7 +27,7 @@ async function firmaOk(f: File) {
   return firmaImagenValida(new Uint8Array(await f.slice(0, 12).arrayBuffer()));
 }
 
-export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({ disabled, enviando, placeholder, onEnviar, onDetener }, ref) {
+export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({ variante = 'dock', disabled, enviando, placeholder, onEnviar, onDetener }, ref) {
   const [texto, setTexto] = useState('');
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const largo = texto.length;
 
   return (
-    <div className="composer-wrap">
+    <div className={`composer-wrap composer-wrap--${variante}`}>
       <div className="composer">
         {adjuntos.length > 0 && (
           <ul className="atts" aria-label="Imágenes adjuntas">
@@ -168,7 +170,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       </div>
       {error && <p className="error composer-err" id="composer-err" role="alert">{error}</p>}
       <p className="composer-note">
-        <span className="largo">Norma IA orienta. </span>Verifica siempre la norma<span className="largo"> y el artículo</span> citados antes de aplicarlos.
+        <span className="largo">Norma IA orienta. Verifica siempre la norma y el artículo citados antes de aplicarlos.</span>
+        <span className="corto">Verifica siempre la norma citada antes de aplicarla.</span>
       </p>
     </div>
   );

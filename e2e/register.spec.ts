@@ -101,7 +101,11 @@ test.describe('registro', () => {
     await page.getByLabel('Correo electrónico').fill('ana@correo.com');
     await page.getByRole('button', { name: 'Enviar código' }).click();
     await expect(page.locator('#resend')).toBeDisabled();
-    await page.clock.runFor(31_000);
+    // La cuenta regresiva encadena un timer por segundo tras cada render: avanzar de a 1 s.
+    for (let s = 0; s < 32; s++) {
+      await page.clock.runFor(1000);
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+    }
     await expect(page.locator('#resend')).toBeEnabled();
     await page.locator('#resend').click();
     await expect(page.locator('#timer')).toContainText('Código reenviado.');

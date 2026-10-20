@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { userMessage } from '@/application/errors';
 import { LIMITES, tituloVisible, type Chat, type ContextoTrabajo } from '@/domain/chat/chat';
 import { useDependencies } from '@/ui/app/DependenciesContext';
-import { Logo } from '@/ui/components/brand/Logo';
 import { ConfirmDialog } from './ConfirmDialog';
 import { keys } from './useChatData';
 
@@ -16,13 +15,15 @@ interface ChatSidebarProps {
   bloqueado: boolean;
   onSeleccionar: (id: number) => void;
   onNuevo: () => void;
+  /** Logo: vuelve al home del chat sin salir de la sesión. */
+  onInicio: () => void;
   onCerrar: () => void;
   onEliminado: (id: number) => void;
   onReintentar: () => void;
 }
 
 export function ChatSidebar(props: ChatSidebarProps) {
-  const { contexto, chats, cargando, fallo, activo, bloqueado, onSeleccionar, onNuevo, onCerrar, onEliminado, onReintentar } = props;
+  const { contexto, chats, cargando, fallo, activo, bloqueado, onSeleccionar, onNuevo, onInicio, onCerrar, onEliminado, onReintentar } = props;
   const { chat } = useDependencies();
   const qc = useQueryClient();
   const [menu, setMenu] = useState<number | null>(null);
@@ -68,7 +69,12 @@ export function ChatSidebar(props: ChatSidebarProps) {
   return (
     <aside className="app-side" aria-label="Conversaciones">
       <div className="app-side-top">
-        <Logo label="Norma IA, inicio" />
+        <button className="logo logo-btn" type="button" aria-label="Norma IA, inicio de consultas" onClick={onInicio} disabled={bloqueado}>
+          <svg aria-hidden="true">
+            <use href="#isotipo" />
+          </svg>
+          <span>NORMA IA</span>
+        </button>
         <button className="side-close" type="button" aria-label="Cerrar panel de conversaciones" onClick={onCerrar}>✕</button>
       </div>
       <button className="btn new-chat" type="button" onClick={onNuevo} disabled={bloqueado}>Nueva consulta</button>

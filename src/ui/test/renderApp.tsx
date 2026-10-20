@@ -42,8 +42,8 @@ export async function* respuesta(texto = 'Según la **A.130**, se requieren 2 sa
 }
 
 /** Casos de uso falsos: la UI se prueba sin red, sin cifrado y sin vi.mock de módulos. */
-export function fakeDeps() {
-  let sesion = false;
+export function fakeDeps({ conSesion = false }: { conSesion?: boolean } = {}) {
+  let sesion = conSesion;
   return {
     auth: {
       iniciarSesion: vi.fn<AuthUseCases['iniciarSesion']>(() => {

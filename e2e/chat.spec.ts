@@ -179,6 +179,32 @@ test.describe('chat RAG (usuario final)', () => {
     await expect(page.getByText('¿Cómo se calcula la dotación de agua?')).toBeVisible();
   });
 
+  test('home: el compositor está sobre las sugerencias y no las tapa; el logo vuelve al home sin cerrar sesión', async ({ page }) => {
+    await fakeBackend(page);
+    await ingresar(page);
+    const composer = await page.locator('.composer').boundingBox();
+    const primera = page.getByRole('list', { name: 'O empieza con una consulta frecuente' }).getByRole('button').first();
+    const caja = await primera.boundingBox();
+    expect(composer && caja && composer.y + composer.height <= caja.y).toBe(true);
+    // La última sugerencia es alcanzable y clicable (nada fijo encima)
+    const ultima = page.getByRole('list', { name: 'O empieza con una consulta frecuente' }).getByRole('button').last();
+    await ultima.scrollIntoViewIfNeeded();
+    await ultima.click({ trial: true });
+
+    await (await historial(page)).getByRole('button', { name: 'Dotación de agua IS.010', exact: true }).click();
+    await expect(page.getByText('¿Cómo se calcula la dotación de agua?')).toBeVisible();
+    await (await historial(page)).getByRole('button', { name: 'Norma IA, inicio de consultas' }).click();
+    await expect(page.getByRole('heading', { name: /Hola, Ana/ })).toBeVisible();
+    await expect(page).toHaveURL(/\/app$/);
+
+    // La landing con sesión no aparenta "sesión cerrada"
+    await page.evaluate(() => history.pushState({}, '', '/'));
+    await page.evaluate(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    await expect(page.getByRole('link', { name: 'Ir a mis consultas' })).toBeVisible();
+    await page.getByRole('link', { name: 'Ir a mis consultas' }).click();
+    await expect(page.getByRole('heading', { name: /Hola, Ana/ })).toBeVisible();
+  });
+
   test('accesibilidad WCAG 2.1 AA en el chat', async ({ page }) => {
     await fakeBackend(page);
     await ingresar(page);

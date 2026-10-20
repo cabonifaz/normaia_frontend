@@ -8,8 +8,13 @@ import { PendingPage } from '@/ui/pages/PendingPage';
 import { RegisterPage } from '@/ui/registro/RegisterPage';
 import { ChatPage } from '@/ui/chat/ChatPage';
 
+/**
+ * Contexto mínimo para las guardas. NO poner AppDependencies completo: TanStack Router propaga
+ * el tipo del contexto a todas las rutas y TypeScript recalcula su varianza en cada <Link>
+ * (el typecheck pasaba de ~5 s a ~60 s).
+ */
 interface RouterContext {
-  deps: AppDependencies;
+  sesion: { activa: () => boolean };
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
@@ -27,6 +32,10 @@ const loginRoute = createRoute({
   path: '/ingresar',
   // Lista cerrada: cualquier otro valor se descarta (nada de la URL se refleja en pantalla).
   validateSearch: (search: Record<string, unknown>): { motivo?: LoginMotivo | undefined } => ({ motivo: parseLoginMotivo(search.motivo) }),
+  // Ya con sesión: directo a sus consultas (no mostrar un login que parece "sesión cerrada").
+  beforeLoad: ({ context }) => {
+    if (context.sesion.activa()) throw redirect({ to: '/app', replace: true });
+  },
   component: function LoginRoute() {
     const { motivo } = loginRoute.useSearch();
     return <LoginPage motivo={motivo} />;
@@ -43,7 +52,7 @@ export const routeTree = rootRoute.addChildren([
     path: '/app',
     // Ruta protegida: sin sesión, al ingreso. La autorización real la hace el backend en cada llamada.
     beforeLoad: ({ context }) => {
-      if (!context.deps.auth.haySesion()) throw redirect({ to: '/ingresar', search: { motivo: 'sesion-requerida' }, replace: true });
+      if (!context.sesion.activa()) throw redirect({ to: '/ingresar', search: { motivo: 'sesion-requerida' }, replace: true });
     },
     component: ChatPage,
   }),
@@ -52,7 +61,7 @@ export const routeTree = rootRoute.addChildren([
 ]);
 
 export function createAppRouter(deps: AppDependencies, history?: RouterHistory) {
-  return createRouter({ routeTree, context: { deps }, ...(history ? { history } : {}), scrollRestoration: true });
+  return createRouter({ routeTree, context: { sesion: { activa: () => deps.auth.haySesion() } }, ...(history ? { history } : {}), scrollRestoration: true });
 }
 
 declare module '@tanstack/react-router' {
