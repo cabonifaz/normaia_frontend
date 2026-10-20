@@ -41,7 +41,7 @@ export function validateReset(v: ResetInput): Partial<Record<ResetField, string>
 }
 
 /** Motivos por los que se llega al ingreso. Lista cerrada: nunca se refleja texto de la URL. */
-export const LOGIN_MOTIVOS = ['sesion-expirada', 'clave-actualizada', 'sesion-cerrada'] as const;
+export const LOGIN_MOTIVOS = ['sesion-expirada', 'clave-actualizada', 'sesion-cerrada', 'sesion-requerida'] as const;
 export type LoginMotivo = (typeof LOGIN_MOTIVOS)[number];
 
 export function parseLoginMotivo(v: unknown): LoginMotivo | undefined {

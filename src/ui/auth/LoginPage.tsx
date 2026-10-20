@@ -14,6 +14,7 @@ const NOTICES: Record<LoginMotivo, string> = {
   'sesion-expirada': 'Tu sesión terminó por seguridad. Vuelve a ingresar para continuar.',
   'clave-actualizada': 'Tu contraseña se actualizó. Ingresa con la nueva.',
   'sesion-cerrada': 'Cerraste sesión correctamente.',
+  'sesion-requerida': 'Ingresa a tu cuenta para continuar.',
 };
 
 const BAD_CREDENTIALS = 'El correo o la contraseña no son correctos. Revísalos e inténtalo de nuevo.';

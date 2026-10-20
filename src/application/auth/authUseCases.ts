@@ -9,6 +9,7 @@ export interface AuthUseCases {
   solicitarRecuperacion(email: string): Promise<{ email: string; challenge: Challenge }>;
   reenviarRecuperacion(challengeId: string): Promise<Challenge>;
   restablecerPassword(challengeId: string, input: ResetInput): Promise<void>;
+  haySesion(): boolean;
 }
 
 export function createAuthUseCases(deps: { repo: AuthRepository; cipher: PayloadCipher }): AuthUseCases {
@@ -26,6 +27,10 @@ export function createAuthUseCases(deps: { repo: AuthRepository; cipher: Payload
       const parsed = emailSchema.safeParse(raw);
       if (!parsed.success) throw invalid();
       return { email: parsed.data, challenge: await repo.solicitarRecuperacion(parsed.data) };
+    },
+
+    haySesion() {
+      return repo.haySesion();
     },
 
     reenviarRecuperacion(challengeId) {

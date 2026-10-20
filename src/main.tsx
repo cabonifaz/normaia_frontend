@@ -10,7 +10,8 @@ const root = document.getElementById('root');
 if (!root) throw new Error('No se encontró #root');
 
 const queryClient = createQueryClient();
-const router = createAppRouter();
+// eslint-disable-next-line prefer-const -- se asigna tras crear deps (el hook 401 necesita el router)
+let router: ReturnType<typeof createAppRouter>;
 const deps = createContainer({
   // Sesión expirada: limpiar caché en memoria y volver al ingreso.
   onUnauthorized: () => {
@@ -18,6 +19,7 @@ const deps = createContainer({
     void router.navigate({ to: '/ingresar', search: { motivo: 'sesion-expirada' } });
   },
 });
+router = createAppRouter(deps);
 
 createRoot(root).render(
   <StrictMode>

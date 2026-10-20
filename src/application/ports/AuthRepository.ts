@@ -8,4 +8,6 @@ export interface AuthRepository {
   solicitarRecuperacion(email: string): Promise<Challenge>;
   reenviarRecuperacion(challengeId: string): Promise<Challenge>;
   restablecerPassword(challengeId: string, codigoProtegido: string, passwordProtegida: string): Promise<void>;
+  /** Hay una sesión de login vigente en este cliente (no implica validez en servidor). */
+  haySesion(): boolean;
 }

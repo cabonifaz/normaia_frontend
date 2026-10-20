@@ -31,5 +31,6 @@ export function createAuthRestRepository(http: HttpClient, session: SessionStore
     solicitarRecuperacion: notAvailable,
     reenviarRecuperacion: notAvailable,
     restablecerPassword: notAvailable,
+    haySesion: () => session.session() !== null,
   };
 }

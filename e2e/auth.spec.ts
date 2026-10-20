@@ -47,6 +47,18 @@ test.describe('ingreso', () => {
     await expect(page.getByRole('alert')).toContainText('Inténtalo de nuevo en 5 minutos');
   });
 
+  test('/app sin sesión redirige al ingreso; tras recargar se pierde la sesión (solo memoria)', async ({ page }) => {
+    await fakeBackend(page);
+    await page.goto('/app');
+    await expect(page).toHaveURL(/\/ingresar\?motivo=sesion-requerida$/);
+    await page.getByLabel('Correo electrónico').fill('ana@correo.com');
+    await page.getByLabel('Contraseña').fill(E2E_PASSWORD);
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await expect(page).toHaveURL(/\/app$/);
+    await page.reload();
+    await expect(page).toHaveURL(/\/ingresar/);
+  });
+
   test('parámetros de URL desconocidos no se reflejan', async ({ page }) => {
     await page.goto('/ingresar?motivo=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E');
     await expect(page.getByRole('heading', { name: 'Ingresa a tu cuenta' })).toBeVisible();

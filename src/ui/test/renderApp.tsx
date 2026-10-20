@@ -24,9 +24,14 @@ const MAESTROS: Record<string, MaestroItem[]> = {
 
 /** Casos de uso falsos: la UI se prueba sin red, sin cifrado y sin vi.mock de módulos. */
 export function fakeDeps() {
+  let sesion = false;
   return {
     auth: {
-      iniciarSesion: vi.fn<AuthUseCases['iniciarSesion']>(() => Promise.resolve()),
+      iniciarSesion: vi.fn<AuthUseCases['iniciarSesion']>(() => {
+        sesion = true;
+        return Promise.resolve();
+      }),
+      haySesion: vi.fn<AuthUseCases['haySesion']>(() => sesion),
       solicitarRecuperacion: vi.fn((email: string) => Promise.resolve({ email: email.trim().toLowerCase(), challenge })),
       reenviarRecuperacion: vi.fn(() => Promise.resolve(challenge)),
       restablecerPassword: vi.fn<AuthUseCases['restablecerPassword']>(() => Promise.resolve()),
@@ -44,7 +49,7 @@ export function fakeDeps() {
 }
 
 export function renderApp(path: string, deps: AppDependencies = fakeDeps()) {
-  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
+  const router = createAppRouter(deps, createMemoryHistory({ initialEntries: [path] }));
   const queryClient = createQueryClient();
   queryClient.setDefaultOptions({ queries: { retry: false } });
   render(<App deps={deps} queryClient={queryClient} router={router} />);

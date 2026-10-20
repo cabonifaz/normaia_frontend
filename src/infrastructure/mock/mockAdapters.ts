@@ -56,18 +56,22 @@ export function createMockRegistroRepository(): RegistroRepository {
 export const MOCK_PASSWORD = 'Norma2026';
 
 export function createMockAuthRepository(): AuthRepository {
+  let sesion = false;
   const challenge = () => ({ challengeId: `mock_${crypto.randomUUID()}`, resendAfter: 30 });
   return {
     iniciarSesion(email, password) {
       if (email === 'bloqueado@correo.com') return Promise.reject(new AppError('rate_limited', 429, 'mock', 'ACCOUNT_LOCKED', 300));
       return password === MOCK_PASSWORD
-        ? delay(undefined, 600)
+        ? delay(undefined, 600).then(() => {
+            sesion = true;
+          })
         : new Promise((_, rej) => setTimeout(() => rej(new AppError('unauthorized', 401, 'mock', 'INVALID_CREDENTIALS')), 600));
     },
     solicitarRecuperacion: () => delay(challenge()),
     reenviarRecuperacion: () => delay(challenge()),
     restablecerPassword: (_id, codigo) =>
       codigo === MOCK_OTP ? delay(undefined, 600) : Promise.reject(new AppError('validation', 400, 'mock', 'OTP_INVALID')),
+    haySesion: () => sesion,
   };
 }
 

@@ -1,4 +1,5 @@
-import { createRootRoute, createRoute, createRouter, Outlet, type RouterHistory } from '@tanstack/react-router';
+import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect, type RouterHistory } from '@tanstack/react-router';
+import type { AppDependencies } from '@/application/AppDependencies';
 import { parseLoginMotivo, type LoginMotivo } from '@/domain/auth/auth';
 import { LoginPage } from '@/ui/auth/LoginPage';
 import { RecoverPage } from '@/ui/auth/RecoverPage';
@@ -6,7 +7,11 @@ import { LandingPage } from '@/ui/landing/LandingPage';
 import { PendingPage } from '@/ui/pages/PendingPage';
 import { RegisterPage } from '@/ui/registro/RegisterPage';
 
-const rootRoute = createRootRoute({
+interface RouterContext {
+  deps: AppDependencies;
+}
+
+const rootRoute = createRootRouteWithContext<RouterContext>()({
   // La raíz descarta cualquier query: cada ruta declara la suya (si no, la query cruda se hereda tal cual).
   validateSearch: (): Record<string, never> => ({}),
   component: Outlet,
@@ -32,13 +37,21 @@ export const routeTree = rootRoute.addChildren([
   createRoute({ getParentRoute: () => rootRoute, path: '/registro', component: RegisterPage }),
   loginRoute,
   createRoute({ getParentRoute: () => rootRoute, path: '/recuperar', component: RecoverPage }),
-  pending('/app', 'Norma IA', 'Consulta RAG pendiente de diseño y contrato del backend.'),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/app',
+    // Ruta protegida: sin sesión, al ingreso. La autorización real la hace el backend en cada llamada.
+    beforeLoad: ({ context }) => {
+      if (!context.deps.auth.haySesion()) throw redirect({ to: '/ingresar', search: { motivo: 'sesion-requerida' }, replace: true });
+    },
+    component: () => <PendingPage title="Norma IA" description="Consulta RAG pendiente de diseño y contrato del backend." />,
+  }),
   pending('/terminos', 'Términos y condiciones', 'Texto legal pendiente.'),
   pending('/privacidad', 'Política de privacidad', 'Texto legal pendiente.'),
 ]);
 
-export function createAppRouter(history?: RouterHistory) {
-  return createRouter({ routeTree, ...(history ? { history } : {}), scrollRestoration: true });
+export function createAppRouter(deps: AppDependencies, history?: RouterHistory) {
+  return createRouter({ routeTree, context: { deps }, ...(history ? { history } : {}), scrollRestoration: true });
 }
 
 declare module '@tanstack/react-router' {

@@ -78,6 +78,15 @@ describe('ingreso', () => {
   });
 });
 
+describe('ruta protegida /app', () => {
+  it('sin sesión redirige al ingreso con aviso', async () => {
+    const { router } = renderApp('/app');
+    expect(await screen.findByRole('heading', { name: 'Ingresa a tu cuenta' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/ingresar');
+    expect(screen.getByRole('status')).toHaveTextContent('Ingresa a tu cuenta para continuar.');
+  });
+});
+
 describe('recuperar contraseña', () => {
   it('flujo completo: correo → código + nueva contraseña → ingreso con aviso', async () => {
     const user = userEvent.setup();
