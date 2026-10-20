@@ -37,6 +37,31 @@ export default tseslint.config(
       'security/detect-object-injection': 'off',
     },
   },
+  // --- Arquitectura hexagonal: dependencias solo hacia el centro ---
+  {
+    files: ['src/domain/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['@/application/**', '@/infrastructure/**', '@/ui/**', '@/di/**', 'react', 'react-dom', '@tanstack/*'], message: 'domain es TS puro: no depende de otras capas ni de frameworks.' }] }],
+    },
+  },
+  {
+    files: ['src/application/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['@/infrastructure/**', '@/ui/**', '@/di/**', 'react', 'react-dom', '@tanstack/*'], message: 'application solo depende de domain y de sus puertos.' }] }],
+    },
+  },
+  {
+    files: ['src/infrastructure/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['@/ui/**', '@/di/**', 'react', 'react-dom', '@tanstack/*'], message: 'infrastructure implementa puertos; no conoce la UI.' }] }],
+    },
+  },
+  {
+    files: ['src/ui/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['@/infrastructure/**', '@/di/**'], message: 'La UI usa casos de uso inyectados (AppDependencies), nunca adaptadores.' }] }],
+    },
+  },
   {
     files: ['**/*.test.{ts,tsx}', 'e2e/**', '*.config.ts', 'deploy/**'],
     languageOptions: { globals: { ...globals.node } },

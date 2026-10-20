@@ -1,13 +1,26 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@/styles/design.css';
-import { App } from './App';
+import { createContainer } from '@/di/container';
+import { App } from '@/ui/app/App';
+import { createQueryClient } from '@/ui/app/queryClient';
+import { createAppRouter } from '@/ui/app/router';
+import '@/ui/styles/design.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('No se encontró #root');
 
+const queryClient = createQueryClient();
+const router = createAppRouter();
+const deps = createContainer({
+  // Sesión expirada: limpiar caché en memoria y volver al ingreso.
+  onUnauthorized: () => {
+    queryClient.clear();
+    void router.navigate({ to: '/ingresar' });
+  },
+});
+
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <App deps={deps} queryClient={queryClient} router={router} />
   </StrictMode>,
 );

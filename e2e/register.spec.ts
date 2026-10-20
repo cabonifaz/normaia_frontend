@@ -66,7 +66,7 @@ test.describe('registro', () => {
     expect(storage).not.toContain(PASSWORD);
     expect(storage).not.toContain('ana@correo.com');
     expect(storage).not.toContain('reg_e2e_');
-    expect(await page.evaluate(() => history.state?.usr ?? null)).toBeNull();
+    expect(await page.evaluate(() => JSON.stringify(history.state))).not.toContain('ana@correo.com');
 
     expect(cspViolations).toEqual([]);
   });

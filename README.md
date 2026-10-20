@@ -1,7 +1,22 @@
 # Norma IA · Frontend
 
-React 19 + TypeScript (strict) + Vite. Consume el backend RAG por REST.
+React 19 + TypeScript (strict) + Vite + TanStack (Query, Router, Form). Consume el backend RAG por REST.
 Diseño replicado 1:1 del prototipo de Claude Design (`src/styles/design.css`).
+
+## Arquitectura hexagonal
+
+```
+src/
+  domain/          Reglas de negocio puras (validaciones, entidades). Sin React ni HTTP.
+  application/     Casos de uso + puertos (interfaces): RegistroRepository, MaestrosRepository, PayloadCipher.
+  infrastructure/  Adaptadores de salida: cliente REST, repositorios REST, cifrado JWE, config.
+  di/              Raíz de composición: conecta puertos con adaptadores.
+  ui/              Adaptador de entrada (React 19): TanStack Router, Query (maestros y mutaciones), Form.
+```
+
+Dependencias solo hacia el centro: `ui → application → domain` e `infrastructure → application → domain`.
+ESLint lo hace cumplir (`no-restricted-imports` por capa): la UI no puede importar adaptadores y el dominio no puede importar React.
+Los tests de casos de uso y de UI inyectan fakes de los puertos (sin `vi.mock`).
 
 ## Ramas y entornos
 
@@ -20,7 +35,7 @@ Fuera de `vite dev`, cualquier build exige API por HTTPS y cifrado de campos sen
 ```bash
 npm ci
 npm run dev          # http://localhost:5173 (requiere .env.local)
-npm run verify       # typecheck + lint + unit + e2e (Playwright) + audit
+npm run verify       # typecheck + lint + unit (Vitest) + e2e (Playwright) + audit
 ```
 
 ## Seguridad (resumen)
@@ -31,10 +46,10 @@ npm run verify       # typecheck + lint + unit + e2e (Playwright) + audit
 - **HTTP:** timeout, `X-Request-Id`, `Idempotency-Key`, `redirect: 'error'`, `no-referrer`, respuestas validadas con zod (contrato), mensajes de error propios (nunca los del servidor).
 - **Cabeceras:** CSP estricta sin `unsafe-inline` + Trusted Types, HSTS, COOP/COEP/CORP, `frame-ancestors 'none'`. Fuente única `deploy/securityHeaders.ts`; `deploy/nginx.conf` se valida contra ella en E2E.
 - **XSS:** lint prohíbe `dangerouslySetInnerHTML`, `innerHTML`, `eval`. Fuentes autoalojadas (sin CDNs de terceros).
-- **Maestros:** toda opción de combo/radio viene del maestro de maestros (`GET /maestros/{grupo}`) y se valida como lista blanca.
+- **Maestros:** toda opción de combo/radio viene del maestro de maestros (`GET /maestros/{grupo}`, caché TanStack Query en memoria) y se valida como lista blanca en UI y en el caso de uso.
 - **Build:** sin source maps; dependencias con versión exacta; `npm audit` en `verify`.
 
 ## Pendiente de contrato del backend
 
-`src/config/endpoints.ts`, `src/features/auth/registerApi.ts`, `src/lib/maestros/maestrosApi.ts`.
-Pantallas sin diseño aún: ingreso, app RAG, legales (`src/routes.tsx`).
+`src/infrastructure/config/endpoints.ts`, `src/infrastructure/registro/RegistroRestRepository.ts`, `src/infrastructure/maestros/MaestrosRestRepository.ts`.
+Pantallas sin diseño aún: ingreso, app RAG, legales (`src/ui/app/router.tsx`).
