@@ -1,10 +1,12 @@
 import { useForm, useStore } from '@tanstack/react-form';
+import { useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { userMessage } from '@/application/errors';
 import { isEmail, MSG } from '@/domain/registro/registro';
 import { useDependencies } from '@/ui/app/DependenciesContext';
 import { useRegistroEntry } from '@/ui/app/RegistroEntryContext';
+import { focusFirstInvalid } from '@/ui/hooks/focusFirstInvalid';
 import { hasErrors, onFormSubmit } from '@/ui/hooks/formSubmit';
 
 /** Si el correo es válido, solicita el código y salta directo al paso 2 (igual que el prototipo). */
@@ -14,9 +16,11 @@ export function HeroForm() {
   const navigate = useNavigate();
   const solicitar = useMutation({ mutationFn: (email: string) => registro.solicitarCodigo(email) });
 
+  const formRef = useRef<HTMLFormElement>(null);
   const form = useForm({
     defaultValues: { email: '' },
     canSubmitWhenInvalid: true,
+    onSubmitInvalid: () => focusFirstInvalid(formRef.current),
     validators: {
       onSubmit: ({ value }) => (isEmail(value.email) ? undefined : { fields: { email: MSG.email } }),
     },
@@ -36,7 +40,7 @@ export function HeroForm() {
         const error = invalid ? MSG.email : solicitar.isError ? userMessage(solicitar.error) : null;
         return (
           <>
-            <form className="hero-form" onSubmit={onFormSubmit(form)} noValidate>
+            <form ref={formRef} className="hero-form" onSubmit={onFormSubmit(form)} noValidate>
               <label className="sr-only" htmlFor="heroEmail">Correo electrónico</label>
               <input
                 className="input"

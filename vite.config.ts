@@ -1,16 +1,30 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import { fileURLToPath, URL } from 'node:url';
 import { securityHeaders } from './deploy/securityHeaders.ts';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  const apiOrigin = env.VITE_API_BASE_URL ? new URL(env.VITE_API_BASE_URL).origin : '';
+  // Con base relativa (/api/v1) el API es del mismo origen: connect-src 'self' basta.
+  const base = env.VITE_API_BASE_URL ?? '';
+  const apiOrigin = /^https?:\/\//.test(base) ? new URL(base).origin : '';
+  // Solo desarrollo: reverse proxy hacia el backend real (evita CORS sin abrirlo en el servidor).
+  const proxyTarget = env.VITE_API_PROXY_TARGET;
+
+  // Modo "lan" (solo desarrollo): HTTPS autofirmado para que WebCrypto/randomUUID funcionen fuera de localhost.
+  const lan = mode === 'lan';
 
   return {
-    plugins: [react()],
+    plugins: [react(), ...(lan ? [basicSsl()] : [])],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-    server: { port: 5173, strictPort: true },
+    server: {
+      port: 5173,
+      strictPort: true,
+      host: lan ? '0.0.0.0' : 'localhost',
+      watch: { ignored: ['**/playwright-report/**', '**/test-results/**'] },
+      ...(proxyTarget ? { proxy: { '/api': { target: proxyTarget, changeOrigin: true, secure: true } } } : {}),
+    },
     preview: { port: 4173, strictPort: true, headers: securityHeaders(apiOrigin) },
     build: {
       target: 'es2022',

@@ -19,24 +19,35 @@ export interface Captured {
   method: string;
   headers: Record<string, string>;
   body: Record<string, unknown> | null;
+  query: Record<string, string>;
 }
 
 interface Options {
   validCode?: string;
-  resendAfter?: number;
   failMaestros?: boolean;
+  /** Dominio que el backend rechaza en validar-correo. */
+  blockedDomain?: string;
 }
 
-/** Backend simulado con CORS estricto (origen exacto + credenciales), como el real. */
+export const E2E_PASSWORD = 'Norma2026';
+const fakeJwt = (sub: string) => `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.c2ln`;
+export const REG_TOKEN = fakeJwt('registro-e2e');
+export const SESSION_TOKEN = fakeJwt('sesion-e2e');
+
+const ok = (data: unknown) => ({ data, result: { idTipoMensaje: 2, mensaje: 'OK' } });
+const fail = (status: number, mensaje: string) => ({ error: { result: { idTipoMensaje: 1, mensaje } }, status_code: status });
+
+/** Backend simulado con el contrato Qamaq (Swagger) y CORS estricto (origen exacto + credenciales). */
 export async function fakeBackend(page: Page, opts: Options = {}) {
   const validCode = opts.validCode ?? '1234';
   const captured: Captured[] = [];
-  const origin = 'http://localhost:4173';
   const cors = {
-    'access-control-allow-origin': origin,
+    'access-control-allow-origin': 'http://localhost:4173',
     'access-control-allow-credentials': 'true',
-    'access-control-allow-headers': 'content-type, x-request-id, idempotency-key, x-xsrf-token',
+    'access-control-allow-headers': 'content-type, authorization, x-request-id, idempotency-key, x-xsrf-token',
     'access-control-allow-methods': 'GET, POST',
+    // Sin esto el navegador oculta Retry-After al front (requisito para el backend real).
+    'access-control-expose-headers': 'retry-after, x-request-id',
     'cross-origin-resource-policy': 'cross-origin',
     vary: 'Origin',
   };
@@ -46,30 +57,57 @@ export async function fakeBackend(page: Page, opts: Options = {}) {
   await page.route(`${E2E_API}/**`, async (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    const path = new URL(req.url()).pathname.replace('/api/v1', '');
+    const url = new URL(req.url());
+    const path = url.pathname.replace('/api/v1', '');
     const body = req.postData() ? (JSON.parse(req.postData()!) as Record<string, unknown>) : null;
-    captured.push({ path, method: req.method(), headers: await req.allHeaders(), body });
+    const headers = await req.allHeaders();
+    captured.push({ path, method: req.method(), headers, body, query: Object.fromEntries(url.searchParams) });
+    const bearer = headers.authorization?.replace(/^Bearer /, '');
 
     switch (path) {
-      case '/maestros/FORMACION':
-        return json(route, 200, { items: [{ codigo: 'ING_CIVIL', descripcion: 'Ingeniero civil', orden: 1 }, { codigo: 'ARQ', descripcion: 'Arquitecto', orden: 2 }, { codigo: 'EST', descripcion: 'Estudiante', orden: 3 }] });
-      case '/maestros/INSTITUCION':
-        return opts.failMaestros
-          ? json(route, 503, {})
-          : json(route, 200, { items: [{ codigo: 'UNI', descripcion: 'Universidad Nacional de Ingeniería', orden: 1 }, { codigo: 'PUCP', descripcion: 'Pontificia Universidad Católica del Perú', orden: 2 }, { codigo: 'OTRA', descripcion: 'Otra institución', orden: 99 }] });
-      case '/auth/register/code':
-      case '/auth/register/code/resend':
-        return json(route, 200, { challengeId: 'ch_e2e_0123456789abcdef', resendAfter: opts.resendAfter ?? 30 });
-      case '/auth/register/verify': {
-        const code = decryptJwe(String(body?.code)).plaintext;
-        return code === validCode
-          ? json(route, 200, { registrationToken: 'reg_e2e_0123456789abcdef' })
-          : json(route, 400, { code: 'OTP_INVALID', message: 'otp mismatch for user id 42' });
+      case '/parametros/get_param_by_id_maestro': {
+        if (!bearer) return json(route, 401, fail(401, 'Token de autenticación requerido'));
+        const grp = url.searchParams.get('grp_id_maestro');
+        if (grp === '23')
+          return json(route, 200, ok([
+            { ID_PARAMETRO: 901, NUM1: 1, DESCRIPCION: 'Ingeniero civil', ORDEN: 1 },
+            { ID_PARAMETRO: 902, NUM1: 2, DESCRIPCION: 'Arquitecto', ORDEN: 2 },
+            { ID_PARAMETRO: 903, NUM1: 3, DESCRIPCION: 'Estudiante', ORDEN: 3 },
+          ]));
+        if (grp === '24')
+          return opts.failMaestros
+            ? json(route, 503, fail(503, 'SP_PARAMETROS_LST timeout'))
+            : json(route, 200, ok([
+                { ID_PARAMETRO: 951, NUM1: 10, DESCRIPCION: 'Universidad Nacional de Ingeniería', ORDEN: 1 },
+                { ID_PARAMETRO: 952, NUM1: 11, DESCRIPCION: 'Pontificia Universidad Católica del Perú', ORDEN: 2 },
+                { ID_PARAMETRO: 953, NUM1: 12, DESCRIPCION: 'Universidad de Lima', ORDEN: 3 },
+                { ID_PARAMETRO: 999, NUM1: 99, DESCRIPCION: 'Otra institución', ORDEN: 99 },
+              ]));
+        return json(route, 404, fail(404, 'Maestro no encontrado'));
       }
-      case '/auth/register/complete':
-        return json(route, 201, { userId: 'u_e2e' });
+      case '/auth/validar-correo': {
+        const dominio = String(body?.correo).split('@')[1] ?? '';
+        return json(route, 200, ok({ dominio, esValido: dominio !== (opts.blockedDomain ?? 'gmail.com') }));
+      }
+      case '/auth/verificacion-codigo': {
+        if (body?.accion === 'REGISTRAR') return json(route, 200, ok({ enviado: true }));
+        const code = decryptJwe(String(body?.codigo)).plaintext;
+        return code === validCode
+          ? json(route, 200, ok({ token: REG_TOKEN }))
+          : json(route, 400, fail(400, 'Código inválido para usuario id 42 (SP_VERIFICACION)'));
+      }
+      case '/auth/crear-usuario':
+        if (bearer !== REG_TOKEN) return json(route, 401, fail(401, 'Token de registro inválido'));
+        return json(route, 201, ok({ idUsuario: 42 }));
+      case '/auth/login': {
+        const clave = decryptJwe(String(body?.clave_acceso)).plaintext;
+        if (body?.usuario === 'bloqueado@correo.com') return route.fulfill({ status: 429, headers: { ...cors, 'content-type': 'application/json', 'retry-after': '300' }, body: JSON.stringify(fail(429, 'bloqueado')) });
+        return clave === E2E_PASSWORD
+          ? json(route, 200, { token: SESSION_TOKEN, status: 'success' })
+          : json(route, 401, fail(401, 'Credenciales o acceso a empresa inválidos'));
+      }
       default:
-        return json(route, 404, {});
+        return json(route, 404, fail(404, 'Not found'));
     }
   });
   return captured;

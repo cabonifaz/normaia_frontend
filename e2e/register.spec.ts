@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { decryptJwe, fakeBackend } from './fakeBackend';
+import { decryptJwe, fakeBackend, REG_TOKEN } from './fakeBackend';
 import { E2E_KID } from './keys';
 
 const PASSWORD = 'Segura2026';
@@ -33,7 +33,13 @@ test.describe('registro', () => {
     await page.getByLabel('Apellidos').fill('Quispe');
     await page.locator('label.choice', { hasText: 'Ingeniero civil' }).click();
     await page.getByLabel('Fecha de nacimiento').fill('1995-02-03');
-    await page.getByLabel('Institución de estudios').selectOption('Universidad Nacional de Ingeniería');
+    // Combo con búsqueda: escribir sin tildes y elegir con teclado
+    const combo = page.getByRole('combobox', { name: 'Institución de estudios' });
+    await combo.fill('ingenieria');
+    await expect(page.getByRole('option')).toHaveCount(1);
+    await combo.press('ArrowDown');
+    await combo.press('Enter');
+    await expect(combo).toHaveValue('Universidad Nacional de Ingeniería');
     await page.getByLabel('Contraseña', { exact: true }).fill(PASSWORD);
     await expect(page.locator('#reqs li.ok')).toHaveCount(3);
     await page.getByRole('button', { name: 'Mostrar' }).first().click();
@@ -45,15 +51,19 @@ test.describe('registro', () => {
     await expect(page.getByRole('heading', { name: 'Tu cuenta está lista' })).toBeVisible();
 
     // --- Verificaciones de seguridad sobre lo que salió por la red ---
-    const complete = captured.find((c) => c.path === '/auth/register/complete')!;
-    const verify = captured.find((c) => c.path === '/auth/register/verify')!;
-    const wirePassword = String(complete.body?.password);
+    const complete = captured.find((c) => c.path === '/auth/crear-usuario')!;
+    const verify = captured.find((c) => c.path === '/auth/verificacion-codigo' && c.body?.accion === 'VALIDAR')!;
+    const wirePassword = String(complete.body?.clave);
     expect(JSON.stringify(complete.body)).not.toContain(PASSWORD);
     expect(wirePassword.split('.')).toHaveLength(5);
     expect(decryptJwe(wirePassword)).toEqual({ header: { alg: 'RSA-OAEP-256', enc: 'A256GCM', kid: E2E_KID, cty: 'text/plain' }, plaintext: PASSWORD });
-    expect(decryptJwe(String(verify.body?.code)).plaintext).toBe('1234');
+    expect(decryptJwe(String(verify.body?.codigo)).plaintext).toBe('1234');
 
-    expect(complete.body).toMatchObject({ formacion: 'ING_CIVIL', institucion: 'UNI' });
+    // Contrato Qamaq: NUM1 de los maestros 23/24 y RegistroBearer en crear-usuario
+    expect(complete.body).toMatchObject({ idFormacion: 1, idInstitucionEstudios: 10, aceptaTerminos: true, fechaNacimiento: '1995-02-03' });
+    expect(complete.headers.authorization).toBe(`Bearer ${REG_TOKEN}`);
+    const maestros = captured.filter((c) => c.path === '/parametros/get_param_by_id_maestro');
+    expect(maestros.map((m) => m.query.grp_id_maestro).sort()).toEqual(['23', '24']);
 
     for (const c of captured.filter((x) => x.method === 'POST')) {
       expect(c.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
@@ -65,7 +75,7 @@ test.describe('registro', () => {
     const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + location.href);
     expect(storage).not.toContain(PASSWORD);
     expect(storage).not.toContain('ana@correo.com');
-    expect(storage).not.toContain('reg_e2e_');
+    expect(storage).not.toContain(REG_TOKEN);
     expect(await page.evaluate(() => JSON.stringify(history.state))).not.toContain('ana@correo.com');
 
     expect(cspViolations).toEqual([]);
@@ -79,20 +89,33 @@ test.describe('registro', () => {
     await page.getByLabel('Dígito 1').pressSequentially('9999');
     await page.getByRole('button', { name: 'Verificar correo' }).click();
     await expect(page.locator('#codeErr')).toHaveText('El código no coincide. Revísalo o pide uno nuevo.');
-    await expect(page.locator('body')).not.toContainText('user id 42');
+    await expect(page.locator('body')).not.toContainText('usuario id 42');
+    await expect(page.locator('body')).not.toContainText('SP_VERIFICACION');
     await expect(page.getByLabel('Dígito 1')).toHaveAttribute('aria-invalid', 'true');
   });
 
   test('reenviar código se habilita al terminar la cuenta regresiva', async ({ page }) => {
-    const captured = await fakeBackend(page, { resendAfter: 2 });
+    const captured = await fakeBackend(page);
+    await page.clock.install();
     await page.goto('/registro');
     await page.getByLabel('Correo electrónico').fill('ana@correo.com');
     await page.getByRole('button', { name: 'Enviar código' }).click();
     await expect(page.locator('#resend')).toBeDisabled();
-    await expect(page.locator('#resend')).toBeEnabled({ timeout: 5000 });
+    await page.clock.runFor(31_000);
+    await expect(page.locator('#resend')).toBeEnabled();
     await page.locator('#resend').click();
     await expect(page.locator('#timer')).toContainText('Código reenviado.');
-    expect(captured.filter((c) => c.path === '/auth/register/code/resend')).toHaveLength(1);
+    // Sin endpoint de reenvío: se vuelve a llamar accion=REGISTRAR
+    expect(captured.filter((c) => c.path === '/auth/verificacion-codigo' && c.body?.accion === 'REGISTRAR')).toHaveLength(2);
+  });
+
+  test('dominio no habilitado: lo informa sin enviar código', async ({ page }) => {
+    const captured = await fakeBackend(page);
+    await page.goto('/registro');
+    await page.getByLabel('Correo electrónico').fill('ana@gmail.com');
+    await page.getByRole('button', { name: 'Enviar código' }).click();
+    await expect(page.locator('#emailErr')).toHaveText('Este correo no pertenece a un dominio habilitado. Usa tu correo institucional o corporativo.');
+    expect(captured.some((c) => c.path === '/auth/verificacion-codigo')).toBe(false);
   });
 
   test('perfil vacío muestra todos los errores del prototipo', async ({ page }) => {
@@ -138,7 +161,7 @@ test.describe('registro', () => {
 });
 
 test.describe('accesibilidad (WCAG 2.1 AA)', () => {
-  for (const path of ['/', '/registro']) {
+  for (const path of ['/', '/registro', '/ingresar', '/ingresar?motivo=sesion-expirada', '/recuperar']) {
     test(`sin violaciones en ${path}`, async ({ page }) => {
       await page.goto(path);
       await page.waitForLoadState('networkidle');

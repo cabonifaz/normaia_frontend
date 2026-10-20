@@ -1,8 +1,7 @@
-import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import type { Challenge } from '@/domain/registro/registro';
 import { useRegistroEntry } from '@/ui/app/RegistroEntryContext';
-import { Logo } from '@/ui/components/brand/Logo';
+import { AuthLayout } from '@/ui/components/AuthLayout';
 import { CodeStep } from './steps/CodeStep';
 import { EmailStep } from './steps/EmailStep';
 import { ProfileStep } from './steps/ProfileStep';
@@ -17,7 +16,6 @@ const STEPS = [
 ] as const;
 
 export function RegisterPage() {
-  const navigate = useNavigate();
   const entryStore = useRegistroEntry();
   const [entry] = useState(() => entryStore.peek());
 
@@ -39,28 +37,11 @@ export function RegisterPage() {
   }, [step]);
 
   return (
-    <div id="registro" className="reg">
-      <aside className="reg-aside">
-        <Logo label="Volver al inicio de Norma IA" />
-        <div className="intro">
-          <h2 className="display">Accede al Reglamento Nacional de Edificaciones.</h2>
-          <p>Pregunta en tus palabras y recibe la norma y el artículo exacto.</p>
-        </div>
-        <ol className="progress" aria-label="Progreso del registro">
-          {STEPS.map(({ n, label }) => (
-            <li key={n} data-step={n} data-state={n < step ? 'done' : n === step ? 'current' : 'todo'} aria-current={n === step ? 'step' : undefined}>
-              <i className="dot" />
-              <span className="label">{label}</span>
-            </li>
-          ))}
-        </ol>
-      </aside>
-
-      <main className="reg-main">
-        <div className="reg-top">
-          <button className="btn btn--text" type="button" onClick={() => void navigate({ to: '/' })}>Volver al inicio</button>
-        </div>
-
+    <AuthLayout
+      intro={{ title: 'Accede al Reglamento Nacional de Edificaciones.', text: 'Pregunta en tus palabras y recibe la norma y el artículo exacto.' }}
+      steps={STEPS}
+      current={step}
+    >
         {step === 1 && (
           <EmailStep
             initialEmail={email}
@@ -102,7 +83,6 @@ export function RegisterPage() {
         )}
 
         {step === 4 && <SuccessStep />}
-      </main>
-    </div>
+    </AuthLayout>
   );
 }

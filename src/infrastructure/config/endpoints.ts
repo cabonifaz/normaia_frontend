@@ -1,22 +1,21 @@
 /**
- * Catálogo único de endpoints REST.
- * PENDIENTE: reemplazar por los contratos reales del backend RAG.
+ * Catálogo de endpoints REST del backend "Qamaq RAG API" (Swagger /docs, v1.0.0).
+ * Rutas relativas a VITE_API_BASE_URL (p. ej. /api/v1).
  */
 export const endpoints = {
   auth: {
-    /** Solicita el código OTP de 4 dígitos para el correo. Respuesta idéntica exista o no el correo (anti-enumeración). */
-    requestCode: '/auth/register/code',
-    /** Reenvía el código. El rate-limit real lo aplica el backend. */
-    resendCode: '/auth/register/code/resend',
-    /** Verifica el código y devuelve un token de registro de un solo uso y corta vida. */
-    verifyCode: '/auth/register/verify',
-    /** Crea la cuenta e inicia sesión (Set-Cookie HttpOnly; Secure; SameSite=Strict). */
-    complete: '/auth/register/complete',
-    session: '/auth/session',
+    /** Valida que el dominio del correo esté habilitado (maestro 20). No envía correo. */
+    validarCorreo: '/auth/validar-correo',
+    /** accion=REGISTRAR envía el código; accion=VALIDAR lo verifica y devuelve el RegistroBearer. */
+    verificacionCodigo: '/auth/verificacion-codigo',
+    /** Crea la cuenta. Requiere RegistroBearer (no el JWT de login). */
+    crearUsuario: '/auth/crear-usuario',
+    /** { usuario, clave_acceso, ref } → { token }. 401 = credenciales o empresa inválidas. */
+    login: '/auth/login',
     logout: '/auth/logout',
   },
-  maestros: {
-    /** Maestro de maestros: opciones de combos por grupo. */
-    byGrupo: (grupo: string) => `/maestros/${encodeURIComponent(grupo)}`,
+  parametros: {
+    /** Maestro de maestros por grupo (GRP_ID_MAESTRO). Requiere Bearer. */
+    porMaestro: '/parametros/get_param_by_id_maestro',
   },
 } as const;

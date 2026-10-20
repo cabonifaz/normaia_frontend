@@ -11,6 +11,11 @@ export interface RequestOptions<S extends z.ZodTypeAny> {
   schema: S;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** false en endpoints de credenciales: ahí un 401 es "credenciales inválidas", no "sesión expirada". */
+  notifyUnauthorized?: boolean;
+  /** Token Bearer para esta petición (lo aporta el repositorio desde el SessionStore). */
+  bearer?: string | null;
+  query?: Record<string, string>;
 }
 
 export interface HttpClientConfig {
@@ -64,6 +69,7 @@ export function createHttpClient(config: HttpClientConfig, hooks: { onUnauthoriz
     const method = opts.method ?? 'GET';
     const requestId = crypto.randomUUID();
     const headers = new Headers({ Accept: 'application/json', 'X-Request-Id': requestId });
+    if (opts.bearer) headers.set('Authorization', `Bearer ${opts.bearer}`);
 
     if (UNSAFE.has(method)) {
       headers.set('Idempotency-Key', crypto.randomUUID());
@@ -81,7 +87,8 @@ export function createHttpClient(config: HttpClientConfig, hooks: { onUnauthoriz
 
     let res: Response;
     try {
-      res = await fetch(baseUrl + path, {
+      const qs = opts.query ? `?${new URLSearchParams(opts.query).toString()}` : '';
+      res = await fetch(baseUrl + path + qs, {
         method,
         headers,
         ...(body !== undefined ? { body } : {}),
@@ -102,7 +109,7 @@ export function createHttpClient(config: HttpClientConfig, hooks: { onUnauthoriz
 
     if (!res.ok) {
       const kind = kindFromStatus(res.status);
-      if (kind === 'unauthorized') hooks.onUnauthorized?.();
+      if (kind === 'unauthorized' && opts.notifyUnauthorized !== false) hooks.onUnauthorized?.();
       const retry = Number(res.headers.get('retry-after'));
       throw new AppError(kind, res.status, requestId, extractErrorCode(payload), Number.isFinite(retry) && retry > 0 ? retry : null);
     }

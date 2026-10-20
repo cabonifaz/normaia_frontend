@@ -37,8 +37,11 @@ describe('registro', () => {
     await user.type(screen.getByLabelText('Apellidos'), 'Quispe');
     await user.click(await screen.findByLabelText('Arquitecto'));
     await user.type(screen.getByLabelText('Fecha de nacimiento'), '1995-02-03');
-    await waitFor(() => expect(screen.getByLabelText('Institución de estudios')).toBeEnabled());
-    await user.selectOptions(screen.getByLabelText('Institución de estudios'), 'Universidad de Lima');
+    const combo = screen.getByRole('combobox', { name: 'Institución de estudios' });
+    await waitFor(() => expect(combo).toBeEnabled());
+    await user.type(combo, 'lima');
+    await user.click(screen.getByRole('option', { name: 'Universidad de Lima' }));
+    expect(combo).toHaveValue('Universidad de Lima');
     await user.type(screen.getByLabelText('Contraseña'), 'Segura123');
     expect(screen.getByText('Mínimo 8 caracteres')).toHaveClass('ok');
     await user.type(screen.getByLabelText('Confirma tu contraseña'), 'Segura123');

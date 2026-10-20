@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --mode lan",
     "build": "tsc -b && vite build",
     "build:staging": "tsc -b && vite build --mode staging",
     "build:preprod": "tsc -b && vite build --mode preprod",
@@ -40,6 +41,7 @@
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-basic-ssl": "2.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "eslint": "10.13.0",
     "eslint-plugin-react-hooks": "7.1.1",

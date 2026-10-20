@@ -1,12 +1,14 @@
 import { useForm, useStore } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { userMessage } from '@/application/errors';
 import { codeSchema, MSG, type Challenge } from '@/domain/registro/registro';
 import { useDependencies } from '@/ui/app/DependenciesContext';
+import { ResendActions } from '@/ui/components/ResendActions';
 import { useCountdown } from '@/ui/hooks/useCountdown';
+import { focusFirstInvalid } from '@/ui/hooks/focusFirstInvalid';
 import { hasErrors, onFormSubmit } from '@/ui/hooks/formSubmit';
-import { CodeInput } from '../CodeInput';
+import { CodeInput } from '@/ui/components/CodeInput';
 
 const CODE_MISMATCH = 'El código no coincide. Revísalo o pide uno nuevo.';
 const EMPTY_CODE = ['', '', '', ''];
@@ -41,9 +43,11 @@ export function CodeStep({ email, challenge, onChallenge, onVerified, onChangeEm
     },
   });
 
+  const formRef = useRef<HTMLFormElement>(null);
   const form = useForm({
     defaultValues: { digits: EMPTY_CODE },
     canSubmitWhenInvalid: true,
+    onSubmitInvalid: () => focusFirstInvalid(formRef.current),
     validators: {
       onSubmit: ({ value }) => (codeSchema.safeParse(value.digits.join('')).success ? undefined : { fields: { digits: MSG.code } }),
     },
@@ -56,16 +60,13 @@ export function CodeStep({ email, challenge, onChallenge, onVerified, onChangeEm
   });
   const submitting = useStore(form.store, (s) => s.isSubmitting);
 
-  const timerText =
-    remaining > 0 ? `${resent && remaining === challenge.resendAfter ? 'Código reenviado. ' : ''}Puedes pedir otro en ${remaining} s` : '';
-
   return (
     <section className="panel" data-panel="2" aria-labelledby="p2">
       <h1 className="display" id="p2" tabIndex={-1}>Revisa tu correo</h1>
       <p>
         Enviamos un código de 4 dígitos a <strong id="sentTo">{email}</strong>. Si no lo ves, revisa tu carpeta de spam.
       </p>
-      <form onSubmit={onFormSubmit(form)} noValidate>
+      <form ref={formRef} onSubmit={onFormSubmit(form)} noValidate>
         <form.Field name="digits">
           {(field) => {
             const incomplete = hasErrors(field.state.meta.errors);
@@ -84,23 +85,16 @@ export function CodeStep({ email, challenge, onChallenge, onVerified, onChangeEm
           }}
         </form.Field>
         <button className="btn" type="submit" disabled={submitting} aria-busy={submitting}>Verificar correo</button>
-        <div className="code-actions">
-          <button className="btn btn--text" type="button" id="resend" disabled={remaining > 0 || reenviar.isPending} onClick={() => reenviar.mutate()}>
-            Reenviar código
-          </button>
-          <span className="muted" id="timer" aria-live="polite">{timerText}</span>
-          <button
-            className="btn btn--text"
-            type="button"
-            id="changeEmail"
-            onClick={() => {
-              stop();
-              onChangeEmail();
-            }}
-          >
-            Cambiar correo
-          </button>
-        </div>
+        <ResendActions
+          remaining={remaining}
+          justResent={resent && remaining === challenge.resendAfter}
+          pending={reenviar.isPending}
+          onResend={() => reenviar.mutate()}
+          onChangeEmail={() => {
+            stop();
+            onChangeEmail();
+          }}
+        />
         {reenviar.isError && <p className="error" role="alert">{userMessage(reenviar.error)}</p>}
       </form>
     </section>

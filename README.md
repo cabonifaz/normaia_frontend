@@ -49,7 +49,26 @@ npm run verify       # typecheck + lint + unit (Vitest) + e2e (Playwright) + aud
 - **Maestros:** toda opción de combo/radio viene del maestro de maestros (`GET /maestros/{grupo}`, caché TanStack Query en memoria) y se valida como lista blanca en UI y en el caso de uso.
 - **Build:** sin source maps; dependencias con versión exacta; `npm audit` en `verify`.
 
-## Pendiente de contrato del backend
+## Integración con backend Qamaq RAG API
 
-`src/infrastructure/config/endpoints.ts`, `src/infrastructure/registro/RegistroRestRepository.ts`, `src/infrastructure/maestros/MaestrosRestRepository.ts`.
-Pantallas sin diseño aún: ingreso, app RAG, legales (`src/ui/app/router.tsx`).
+Contrato: Swagger `/docs` (v1.0.0). Adaptadores en `src/infrastructure/{registro,auth,maestros}`.
+En desarrollo, Vite hace de proxy de `/api` hacia `VITE_API_PROXY_TARGET` (mismo origen → sin CORS).
+En producción se recomienda lo mismo con nginx (`location /api/ { proxy_pass … }`).
+
+`npm run dev:lan` publica en la red local por HTTPS autofirmado (WebCrypto exige contexto seguro).
+
+### Requisitos pendientes del backend (seguridad e integración)
+
+| # | Tema | Estado actual | Requisito |
+|---|------|---------------|-----------|
+| 1 | `GET /company/get_companies_login` | Público, devuelve `SECRET_KEY` de todas las empresas | **Crítico:** protegerlo o eliminarlo |
+| 2 | `ref` en `/auth/login` | Secret key de empresa obligatoria | Un valor en el bundle es público: resolver la empresa en servidor |
+| 3 | Sesión | JWT en el cuerpo (el front lo guarda solo en memoria) | Cookie `HttpOnly; Secure; SameSite=Strict` |
+| 4 | Maestros 23/24 en el registro | Exigen JWT de login | Aceptar RegistroBearer o exponer endpoint público de solo lectura |
+| 5 | Respuesta de `VALIDAR` | Campo del RegistroBearer no documentado | Documentar en el Swagger |
+| 6 | Recuperación de contraseña | No existe | Endpoints solicitar código / restablecer |
+| 7 | CORS | Origen del front no permitido; `Retry-After` no expuesto | Lista blanca + `Access-Control-Expose-Headers: Retry-After, X-Request-Id` |
+| 8 | Cifrado de campos (JWE) | Espera claves en claro | Descifrar JWE RSA-OAEP-256/A256GCM (el front ya lo soporta) |
+| 9 | Cabeceras de seguridad del API | Sin HSTS/CSP/nosniff | Añadirlas |
+
+Pantallas sin diseño aún: app RAG y legales (`src/ui/app/router.tsx`).

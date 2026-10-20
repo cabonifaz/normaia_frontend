@@ -6,7 +6,10 @@ import { z } from 'zod';
  */
 const EnvSchema = z
   .object({
-    VITE_API_BASE_URL: z.string().url(),
+    // Absoluta (https://api…) o relativa al mismo origen (/api/v1, detrás de reverse proxy: sin CORS).
+    VITE_API_BASE_URL: z.string().refine((v) => /^\/[A-Za-z0-9/_-]*$/.test(v) || z.string().url().safeParse(v).success, 'URL o ruta relativa inválida'),
+    /** secret_key de empresa que exige /auth/login. */
+    VITE_COMPANY_REF: z.string().max(256).optional().default(''),
     VITE_PAYLOAD_ENCRYPTION: z.enum(['required', 'off']).default('required'),
     VITE_PAYLOAD_PUBLIC_KEY: z.string().optional().default(''),
     VITE_PAYLOAD_KEY_ID: z.string().optional().default(''),
@@ -18,7 +21,7 @@ const EnvSchema = z
     if (env.PROD && env.VITE_USE_MOCKS === 'true') {
       ctx.addIssue({ code: 'custom', path: ['VITE_USE_MOCKS'], message: 'Los adaptadores mock solo se permiten en desarrollo.' });
     }
-    if (env.PROD && !env.VITE_API_BASE_URL.startsWith('https://')) {
+    if (env.PROD && !env.VITE_API_BASE_URL.startsWith('https://') && !env.VITE_API_BASE_URL.startsWith('/')) {
       ctx.addIssue({ code: 'custom', path: ['VITE_API_BASE_URL'], message: 'En producción el API debe servirse por HTTPS.' });
     }
     if (env.PROD && env.VITE_PAYLOAD_ENCRYPTION !== 'required') {
@@ -47,6 +50,7 @@ function load() {
     }),
     httpTimeoutMs: e.VITE_HTTP_TIMEOUT_MS,
     useMocks: e.VITE_USE_MOCKS === 'true',
+    companyRef: e.VITE_COMPANY_REF,
   });
 }
 

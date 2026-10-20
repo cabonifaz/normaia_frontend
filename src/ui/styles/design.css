@@ -280,3 +280,46 @@ p{margin:0}
 .pending-page{min-height:100vh;display:flex;flex-direction:column}
 .pending-page main{flex:1;padding:var(--s7) 0}
 .pending-page main .wrap{display:flex;flex-direction:column;gap:var(--s4);align-items:flex-start}
+
+/* [front] Combobox con búsqueda (mismo lenguaje: borde negro, sin radios, nodo cuadrado) */
+.combo{position:relative}
+.combo .input{padding-right:48px}
+.combo-caret{position:absolute;right:20px;top:26px;width:9px;height:9px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.combo-list{position:absolute;z-index:20;left:0;right:0;top:100%;margin:0;padding:var(--s1) 0;list-style:none;background:var(--paper);border:1.5px solid var(--ink);border-top:0;max-height:264px;overflow-y:auto;overscroll-behavior:contain}
+.combo-list li{display:flex;align-items:center;gap:10px;min-height:44px;padding:var(--s2) var(--s3);cursor:pointer;font-size:.95rem}
+.combo-list li::before{content:"";flex:none;width:8px;height:8px}
+.combo-list li[data-active]{background:var(--wash)}
+.combo-list li[aria-selected="true"]{font-weight:600}
+.combo-list li[aria-selected="true"]::before{background:var(--ink)}
+.combo-list .combo-empty{color:var(--graphite);cursor:default}
+.input:disabled{border-color:var(--rule);color:#8A8A8A;cursor:not-allowed}
+
+/* [front] Aviso informativo (variante en tinta del .error) */
+.notice{display:flex;gap:10px;align-items:flex-start;padding:var(--s3);border:1.5px solid var(--ink);font-size:.95rem;font-weight:500}
+.notice::before{content:"";flex:none;width:var(--node);height:var(--node);background:var(--ink);margin-top:.45em}
+.notice--error{border-color:var(--error);color:var(--error)}
+.notice--error::before{background:var(--error)}
+
+/* [front] Ingreso / recuperación */
+.field-head{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s3)}
+.field-head .btn--text,.field-head a{font-size:.9rem}
+.caps{font-size:.88rem;font-weight:600;display:flex;gap:6px;align-items:center}
+.caps::before{content:"⇪";font-weight:700}
+.aside-foot{font-size:.88rem;color:#BDBDBD;margin:0}
+.aside-foot strong{color:var(--paper)}
+.auth-alt{font-size:.95rem;color:var(--graphite)}
+.auth-alt a{font-weight:600;color:var(--ink)}
+
+/* [front] Crítica de diseño (ingreso/recuperación) */
+/* Encabezados que reciben foco programático (anuncio a lectores): sin contorno visual. */
+h1[tabindex="-1"]:focus{outline:none}
+/* Área táctil ≥ 32px para el enlace junto a la etiqueta, sin cambiar su aspecto. */
+.field-head a{padding:8px 0;margin:-8px 0}
+@media (max-width:960px){
+  /* Pantallas de un solo propósito: el formulario es protagonista en móvil. */
+  .reg-aside .aside-foot{display:none}
+}
+@media (max-width:640px){
+  /* Etiquetas de pasos: ocultas a la vista pero presentes para lectores de pantalla. */
+  .progress li span.label{display:block;position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}

@@ -1,4 +1,5 @@
 import { AppError } from '@/application/errors';
+import type { AuthRepository } from '@/application/ports/AuthRepository';
 import type { MaestrosRepository } from '@/application/ports/MaestrosRepository';
 import type { RegistroRepository } from '@/application/ports/RegistroRepository';
 import type { MaestroItem } from '@/domain/maestros/maestro';
@@ -42,6 +43,31 @@ export function createMockRegistroRepository(): RegistroRepository {
     verificarCodigo: (_id, codigo) =>
       codigo === MOCK_OTP ? delay(`mock_reg_${crypto.randomUUID()}`) : Promise.reject(new AppError('validation', 400, 'mock', 'OTP_INVALID')),
     crearCuenta: () => delay(undefined, 700),
+  };
+}
+
+/**
+ * Ingreso simulado:
+ *  - contraseña "Norma2026" → éxito
+ *  - correo "bloqueado@correo.com" → 429 (bloqueo temporal)
+ *  - cualquier otra → credenciales inválidas
+ * Recuperación: código 1234.
+ */
+export const MOCK_PASSWORD = 'Norma2026';
+
+export function createMockAuthRepository(): AuthRepository {
+  const challenge = () => ({ challengeId: `mock_${crypto.randomUUID()}`, resendAfter: 30 });
+  return {
+    iniciarSesion(email, password) {
+      if (email === 'bloqueado@correo.com') return Promise.reject(new AppError('rate_limited', 429, 'mock', 'ACCOUNT_LOCKED', 300));
+      return password === MOCK_PASSWORD
+        ? delay(undefined, 600)
+        : new Promise((_, rej) => setTimeout(() => rej(new AppError('unauthorized', 401, 'mock', 'INVALID_CREDENTIALS')), 600));
+    },
+    solicitarRecuperacion: () => delay(challenge()),
+    reenviarRecuperacion: () => delay(challenge()),
+    restablecerPassword: (_id, codigo) =>
+      codigo === MOCK_OTP ? delay(undefined, 600) : Promise.reject(new AppError('validation', 400, 'mock', 'OTP_INVALID')),
   };
 }
 

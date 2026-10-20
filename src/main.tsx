@@ -15,7 +15,7 @@ const deps = createContainer({
   // Sesión expirada: limpiar caché en memoria y volver al ingreso.
   onUnauthorized: () => {
     queryClient.clear();
-    void router.navigate({ to: '/ingresar' });
+    void router.navigate({ to: '/ingresar', search: { motivo: 'sesion-expirada' } });
   },
 });
 

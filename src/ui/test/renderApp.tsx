@@ -2,6 +2,7 @@ import { createMemoryHistory } from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import { vi } from 'vitest';
 import type { AppDependencies } from '@/application/AppDependencies';
+import type { AuthUseCases } from '@/application/auth/authUseCases';
 import type { MaestroItem } from '@/domain/maestros/maestro';
 import { App } from '@/ui/app/App';
 import { createQueryClient } from '@/ui/app/queryClient';
@@ -24,6 +25,12 @@ const MAESTROS: Record<string, MaestroItem[]> = {
 /** Casos de uso falsos: la UI se prueba sin red, sin cifrado y sin vi.mock de módulos. */
 export function fakeDeps() {
   return {
+    auth: {
+      iniciarSesion: vi.fn<AuthUseCases['iniciarSesion']>(() => Promise.resolve()),
+      solicitarRecuperacion: vi.fn((email: string) => Promise.resolve({ email: email.trim().toLowerCase(), challenge })),
+      reenviarRecuperacion: vi.fn(() => Promise.resolve(challenge)),
+      restablecerPassword: vi.fn<AuthUseCases['restablecerPassword']>(() => Promise.resolve()),
+    },
     registro: {
       solicitarCodigo: vi.fn((email: string) => Promise.resolve({ email: email.trim().toLowerCase(), challenge })),
       reenviarCodigo: vi.fn(() => Promise.resolve(challenge)),

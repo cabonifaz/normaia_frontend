@@ -43,9 +43,15 @@ const GENERIC: Record<AppErrorKind, string> = {
   contract: 'Tuvimos un problema. Inténtalo de nuevo en unos minutos.',
 };
 
+/** Mensajes por código de negocio, válidos en cualquier pantalla. */
+const BY_CODE: Partial<Record<string, string>> = {
+  DOMINIO_NO_PERMITIDO: 'Este correo no pertenece a un dominio habilitado. Usa tu correo institucional o corporativo.',
+  RECUPERACION_NO_DISPONIBLE: 'La recuperación de contraseña aún no está disponible. Comunícate con soporte para restablecer tu acceso.',
+};
+
 export function userMessage(err: unknown, overrides: Partial<Record<string, string>> = {}): string {
   if (err instanceof AppError) {
-    const byCode = err.code ? overrides[err.code] : undefined;
+    const byCode = err.code ? (overrides[err.code] ?? BY_CODE[err.code]) : undefined;
     return byCode ?? overrides[err.kind] ?? GENERIC[err.kind];
   }
   return GENERIC.server;
