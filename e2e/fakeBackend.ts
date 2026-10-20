@@ -68,28 +68,29 @@ export async function fakeBackend(page: Page, opts: Options = {}) {
 
     switch (path) {
       case '/parametros/get_param_by_id_maestro': {
-        if (!bearer) return json(route, 401, fail(401, 'Token de autenticación requerido'));
         const grp = url.searchParams.get('grp_id_maestro');
         if (grp === '23')
           return json(route, 200, ok([
-            { ID_PARAMETRO: 901, NUM1: 1, DESCRIPCION: 'Ingeniero civil', ORDEN: 1 },
-            { ID_PARAMETRO: 902, NUM1: 2, DESCRIPCION: 'Arquitecto', ORDEN: 2 },
-            { ID_PARAMETRO: 903, NUM1: 3, DESCRIPCION: 'Estudiante', ORDEN: 3 },
+            { ID_PARAMETRO: 901, ID_MAESTRO: 0, ID_SUB_MAESTRO: null, NUM1: 1, NUM2: 0, NUM3: 0, STRING1: 'Ingeniero civil', STRING2: '', STRING3: '' },
+            { ID_PARAMETRO: 902, ID_MAESTRO: 0, ID_SUB_MAESTRO: null, NUM1: 2, NUM2: 0, NUM3: 0, STRING1: 'Arquitecto', STRING2: '', STRING3: '' },
+            { ID_PARAMETRO: 903, ID_MAESTRO: 0, ID_SUB_MAESTRO: null, NUM1: 3, NUM2: 0, NUM3: 0, STRING1: 'Estudiante', STRING2: '', STRING3: '' },
           ]));
         if (grp === '24')
           return opts.failMaestros
             ? json(route, 503, fail(503, 'SP_PARAMETROS_LST timeout'))
             : json(route, 200, ok([
-                { ID_PARAMETRO: 951, NUM1: 10, DESCRIPCION: 'Universidad Nacional de Ingeniería', ORDEN: 1 },
-                { ID_PARAMETRO: 952, NUM1: 11, DESCRIPCION: 'Pontificia Universidad Católica del Perú', ORDEN: 2 },
-                { ID_PARAMETRO: 953, NUM1: 12, DESCRIPCION: 'Universidad de Lima', ORDEN: 3 },
-                { ID_PARAMETRO: 999, NUM1: 99, DESCRIPCION: 'Otra institución', ORDEN: 99 },
+                { ID_PARAMETRO: 951, ID_MAESTRO: 0, ID_SUB_MAESTRO: null, NUM1: 10, NUM2: 0, NUM3: 0, STRING1: 'Universidad Nacional de Ingeniería', STRING2: '', STRING3: '' },
+                { ID_PARAMETRO: 952, ID_MAESTRO: 0, ID_SUB_MAESTRO: null, NUM1: 11, NUM2: 0, NUM3: 0, STRING1: 'Pontificia Universidad Católica del Perú', STRING2: '', STRING3: '' },
+                { ID_PARAMETRO: 953, ID_MAESTRO: 0, ID_SUB_MAESTRO: null, NUM1: 12, NUM2: 0, NUM3: 0, STRING1: 'Universidad de Lima', STRING2: '', STRING3: '' },
+                { ID_PARAMETRO: 999, ID_MAESTRO: 0, ID_SUB_MAESTRO: null, NUM1: 99, NUM2: 0, NUM3: 0, STRING1: 'Otra institución', STRING2: '', STRING3: '' },
               ]));
         return json(route, 404, fail(404, 'Maestro no encontrado'));
       }
       case '/auth/validar-correo': {
         const dominio = String(body?.correo).split('@')[1] ?? '';
-        return json(route, 200, ok({ dominio, esValido: dominio !== (opts.blockedDomain ?? 'gmail.com') }));
+        if (body?.correo === 'existe@correo.com') return json(route, 200, { data: { dominio, esValido: false, resultado: 'CORREO_EXISTENTE' }, result: { idTipoMensaje: 1, mensaje: 'Una cuenta registrada con ese correo ya existe' } });
+        const permitido = dominio !== (opts.blockedDomain ?? 'gmail.com');
+        return json(route, 200, ok({ dominio, esValido: permitido, resultado: permitido ? 'CORREO_DISPONIBLE' : 'DOMINIO_NO_PERMITIDO' }));
       }
       case '/auth/verificacion-codigo': {
         // Forma real verificada contra el backend: REGISTRAR responde solo { result }

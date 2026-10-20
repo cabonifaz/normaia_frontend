@@ -62,13 +62,15 @@ En producción se recomienda lo mismo con nginx (`location /api/ { proxy_pass �
 | # | Tema | Estado actual | Requisito |
 |---|------|---------------|-----------|
 | 1 | `GET /company/get_companies_login` | Público, devuelve `SECRET_KEY` de todas las empresas | **Crítico:** protegerlo o eliminarlo |
-| 2 | `ref` en `/auth/login` | Secret key de empresa obligatoria | Un valor en el bundle es público: resolver la empresa en servidor |
+| 2 | `ref` en `/auth/login` | Funciona con la secret_key de la empresa (verificado 2026-10-20). Va en `VITE_COMPANY_REF` → **queda en el bundle público** | Resolver la empresa en servidor (p. ej. por dominio) y dejar de exigirla al cliente |
 | 3 | Sesión | JWT en el cuerpo (el front lo guarda solo en memoria) | Cookie `HttpOnly; Secure; SameSite=Strict` |
-| 4 | Maestros 23/24 en el registro | **Bloqueante, verificado 2026-10-20:** con el RegistroBearer responden 401 "Token inválido" | Aceptar RegistroBearer o exponer endpoint público de solo lectura |
+| 4 | Maestros 23/24 en el registro | ✅ Resuelto: públicos; contrato `{ NUM1, STRING1 }` | — |
 | 5 | Respuesta de `VALIDAR` | Real: `{ esValido, tokenRegistro, expiraEnSegundos: 900 }` (no documentado) | Documentar en el Swagger. El front ya lo usa y maneja el vencimiento de 15 min |
 | 6 | Recuperación de contraseña | No existe | Endpoints solicitar código / restablecer |
 | 7 | CORS | Origen del front no permitido; `Retry-After` no expuesto | Lista blanca + `Access-Control-Expose-Headers: Retry-After, X-Request-Id` |
 | 8 | Cifrado de campos (JWE) | Espera claves en claro | Descifrar JWE RSA-OAEP-256/A256GCM (el front ya lo soporta) |
 | 9 | Cabeceras de seguridad del API | Sin HSTS/CSP/nosniff | Añadirlas |
+| 10 | Enumeración de cuentas | `validar-correo` (público) responde `CORREO_EXISTENTE` vs `CORREO_DISPONIBLE` | Rate-limit + CAPTCHA, o respuesta uniforme y avisar por correo |
+| 11 | Estabilidad | `validar-correo` devolvió 500 para cualquier correo durante ~30 min (2026-10-20); el health check seguía en "healthy" | Health check que cubra BD/SP y alertas |
 
 Pantallas sin diseño aún: app RAG y legales (`src/ui/app/router.tsx`).

@@ -118,6 +118,15 @@ test.describe('registro', () => {
     expect(captured.some((c) => c.path === '/auth/verificacion-codigo')).toBe(false);
   });
 
+  test('correo ya registrado: lo dice claramente (no como dominio inválido)', async ({ page }) => {
+    const captured = await fakeBackend(page);
+    await page.goto('/registro');
+    await page.getByLabel('Correo electrónico').fill('existe@correo.com');
+    await page.getByRole('button', { name: 'Enviar código' }).click();
+    await expect(page.locator('#emailErr')).toHaveText('Ya existe una cuenta con este correo. Ingresa con tu contraseña o recupérala.');
+    expect(captured.some((c) => c.path === '/auth/verificacion-codigo')).toBe(false);
+  });
+
   test('verificación vencida (15 min): mensaje claro y vuelta a pedir código con el correo conservado', async ({ page }) => {
     await fakeBackend(page, { expiredRegistration: true });
     await page.goto('/registro');

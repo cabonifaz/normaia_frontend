@@ -17,7 +17,10 @@ import type { HttpClient } from '@/infrastructure/http/httpClient';
  */
 const RESEND_AFTER = 30;
 
-const DominioSchema = envelope(z.object({ dominio: z.string().max(253).optional(), esValido: z.boolean() }));
+/** Real: { dominio, esValido, resultado: CORREO_DISPONIBLE | CORREO_EXISTENTE | … }. */
+const DominioSchema = envelope(
+  z.object({ dominio: z.string().max(253).optional(), esValido: z.boolean(), resultado: z.string().max(64).optional() }),
+);
 
 /** Respuesta real de accion=VALIDAR (verificada contra el backend): { esValido, tokenRegistro, expiraEnSegundos }. */
 const ValidarSchema = envelope(
@@ -37,6 +40,7 @@ export function createRegistroRestRepository(http: HttpClient, session: SessionS
   return {
     async solicitarCodigo(correo) {
       const { data } = await http(endpoints.auth.validarCorreo, { method: 'POST', body: { correo }, schema: DominioSchema, notifyUnauthorized: false });
+      if (data.resultado === 'CORREO_EXISTENTE') throw new AppError('conflict', 200, 'local', 'CORREO_EXISTENTE');
       if (!data.esValido) throw new AppError('validation', 200, 'local', 'DOMINIO_NO_PERMITIDO');
       return enviarCodigo(correo);
     },
