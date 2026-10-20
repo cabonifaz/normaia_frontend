@@ -1,6 +1,6 @@
 import { constants, createDecipheriv, createPrivateKey, privateDecrypt } from 'node:crypto';
 import type { Page, Route } from '@playwright/test';
-import { E2E_API, e2eKeys } from './keys';
+import { E2E_API, E2E_ATTACHMENTS, e2eKeys } from './keys';
 
 /** Descifra un JWE compacto RSA-OAEP-256/A256GCM, como lo haría el backend. */
 export function decryptJwe(jwe: string): { header: Record<string, string>; plaintext: string } {
@@ -29,12 +29,35 @@ interface Options {
   blockedDomain?: string;
   /** Simula que el RegistroBearer venció (15 min) al crear la cuenta. */
   expiredRegistration?: boolean;
+  /** Áreas del usuario (por defecto NORMA/GENERAL). [] = usuario sin área. */
+  areas?: { ID_EMPRESA: number; EMPRESA: string; ID_AREA: number; AREA: string }[];
+  /** El stream del chat responde con un evento de error. */
+  chatError?: boolean;
+  /** Las URLs prefirmadas de S3 del historial ya caducaron. */
+  expiredAttachments?: boolean;
 }
+
+const PNG_1PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 export const E2E_PASSWORD = 'Norma2026';
 const fakeJwt = (sub: string) => `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.c2ln`;
 export const REG_TOKEN = fakeJwt('registro-e2e');
-export const SESSION_TOKEN = fakeJwt('sesion-e2e');
+const sessionClaims = { ID_USUARIO: 4049, USUARIO: 'ana@correo.com', NOMBRES: 'Ana', APELLIDOS: 'Quispe', ID_TIPO_ROL: 3, ROL: 'Usuario', company_areas: [] };
+export const SESSION_TOKEN = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify(sessionClaims)).toString('base64url')}.c2ln`;
+
+export const RESPUESTA_E2E = 'Según la **A.130**, un centro comercial requiere **2 salidas** por nivel.\n\n| Aforo | Salidas |\n| --- | --- |\n| Hasta 500 | 2 |';
+
+/** SSE como el backend real: texto ACUMULADO en cada text_chunk. */
+function sse(chatId: number, nuevo: boolean, error = false) {
+  const ev = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
+  let out = ev({ type: 'progress', message: 'Buscando en el reglamento…' }) + ev({ type: 'metadata', chat_id: chatId });
+  if (nuevo) out += ev({ type: 'chat_created', chat: { ID_CHAT: chatId, ID_AREA: 7, ID_EMPRESA: 1, TITULO: 'Salidas en centro comercial', ULTIMO_MENSAJE_FECHA: new Date().toISOString(), ID_ESTADO_REGISTRO: 1 } });
+  if (error) return out + ev({ type: 'error', message: 'Bedrock throttling (SP_RAG_LOG id 77)' });
+  out += ev({ type: 'assistant_metadata', sender: 1, created_at: String(Date.now()) });
+  const palabras = RESPUESTA_E2E.split(' ');
+  for (let i = 1; i <= palabras.length; i++) out += ev({ type: 'text_chunk', content: palabras.slice(0, i).join(' ') });
+  return out + ev({ type: 'audio_chunk', content: 'AAAA' }) + ev({ type: 'complete' });
+}
 
 const ok = (data: unknown) => ({ data, result: { idTipoMensaje: 2, mensaje: 'OK' } });
 const fail = (status: number, mensaje: string) => ({ error: { result: { idTipoMensaje: 1, mensaje } }, status_code: status });
@@ -47,7 +70,7 @@ export async function fakeBackend(page: Page, opts: Options = {}) {
     'access-control-allow-origin': 'http://localhost:4173',
     'access-control-allow-credentials': 'true',
     'access-control-allow-headers': 'content-type, authorization, x-request-id, idempotency-key, x-xsrf-token',
-    'access-control-allow-methods': 'GET, POST',
+    'access-control-allow-methods': 'GET, POST, PATCH, DELETE',
     // Sin esto el navegador oculta Retry-After al front (requisito para el backend real).
     'access-control-expose-headers': 'retry-after, x-request-id',
     'cross-origin-resource-policy': 'cross-origin',
@@ -55,6 +78,24 @@ export async function fakeBackend(page: Page, opts: Options = {}) {
   };
   const json = (route: Route, status: number, body: unknown) =>
     route.fulfill({ status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  // PUT directo a S3 (URL prefirmada)
+  await page.route(`${E2E_ATTACHMENTS}/**`, async (route) => {
+    const req = route.request();
+    captured.push({ path: new URL(req.url()).pathname, method: req.method(), headers: await req.allHeaders(), body: null, query: {} });
+    if (req.method() === 'GET') {
+      // URL prefirmada caducada → S3 responde 403
+      if (opts.expiredAttachments) return route.fulfill({ status: 403, contentType: 'application/xml', body: '<Error><Code>AccessDenied</Code></Error>' });
+      return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from(PNG_1PX, 'base64') });
+    }
+    return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': 'http://localhost:4173' } });
+  });
+
+  let siguienteChat = 300;
+  const chats = [
+    { ID_CHAT: 201, ID_AREA: 7, ID_EMPRESA: 1, TITULO: 'Dotación de agua IS.010', ULTIMO_MENSAJE_FECHA: '2026-10-19T10:00:00' },
+    { ID_CHAT: 202, ID_AREA: 99, ID_EMPRESA: 1, TITULO: 'De otra área (no debe verse)', ULTIMO_MENSAJE_FECHA: '2026-10-20T10:00:00' },
+  ];
 
   await page.route(`${E2E_API}/**`, async (route) => {
     const req = route.request();
@@ -66,7 +107,49 @@ export async function fakeBackend(page: Page, opts: Options = {}) {
     captured.push({ path, method: req.method(), headers, body, query: Object.fromEntries(url.searchParams) });
     const bearer = headers.authorization?.replace(/^Bearer /, '');
 
+    const auth = () => bearer === SESSION_TOKEN;
+    const chatPath = /^\/chats\/(\d+)$/.exec(path);
+    if (chatPath) {
+      if (!auth()) return json(route, 401, fail(401, 'Token inválido'));
+      const id = Number(chatPath[1]);
+      const c = chats.find((x) => x.ID_CHAT === id);
+      if (!c) return json(route, 404, fail(404, 'no existe'));
+      if (req.method() === 'PATCH') c.TITULO = String(body?.titulo);
+      if (req.method() === 'DELETE') chats.splice(chats.indexOf(c), 1);
+      return json(route, 200, { ID_TIPO_MENSAJE: 2, MENSAJE: 'OK' });
+    }
+
     switch (path) {
+      case '/auth/company-areas':
+        if (!auth()) return json(route, 401, fail(401, 'Token inválido'));
+        return json(route, 200, { company_areas: (opts.areas ?? [{ ID_EMPRESA: 1, EMPRESA: 'NORMA', ID_AREA: 7, AREA: 'GENERAL' }]).map((a) => ({ ...a, LOGO: null, SECRET_KEY: 'NO-DEBE-USARSE' })), result: { idTipoMensaje: 2, mensaje: 'ok' } });
+      case '/chats/get_chats':
+        if (!auth()) return json(route, 401, fail(401, 'Token inválido'));
+        return json(route, 200, { chats, result: { idTipoMensaje: 2, mensaje: 'ok' } });
+      case '/messages/chat': {
+        if (!auth()) return json(route, 401, fail(401, 'Token inválido'));
+        if (body?.chat_id !== '201') return json(route, 200, { messages: [], last_evaluated_key: null });
+        return json(route, 200, {
+          messages: [
+            { id: 'm1', chat_id: '201', created_at: '1760868000000', sender: 0, message: '¿Cómo se calcula la dotación de agua?', attachment_keys: null, attachment_urls: [`${E2E_ATTACHMENTS}/1/7/plano.png?X-Amz-Signature=abc`] },
+            { id: 'm2', chat_id: '201', created_at: '1760868005000', sender: 1, message: 'Según la **IS.010**, la dotación depende del uso.', attachment_keys: null, attachment_urls: null },
+          ],
+          last_evaluated_key: null,
+        });
+      }
+      case '/messages/attachment-upload-urls':
+        if (!auth()) return json(route, 401, fail(401, 'Token inválido'));
+        return json(route, 200, { uploads: (body?.filenames as string[]).map((n) => ({ presigned_url: `${E2E_ATTACHMENTS}/1/7/${body?.timestamp}/${n}?X-Amz-Signature=e2e`, s3_key: `1/7/${n}`, document_name: n })) });
+      case '/rag/chat-streaming':
+      case '/rag/vlm-streaming': {
+        if (!auth()) return json(route, 401, fail(401, 'Token inválido'));
+        const nuevo = body?.chat_id === null;
+        const id = nuevo ? siguienteChat++ : Number(body?.chat_id);
+        if (nuevo) chats.unshift({ ID_CHAT: id, ID_AREA: 7, ID_EMPRESA: 1, TITULO: 'Salidas en centro comercial', ULTIMO_MENSAJE_FECHA: new Date().toISOString() });
+        return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }, body: sse(id, nuevo, opts.chatError) });
+      }
+      case '/auth/logout':
+        return json(route, 200, { result: { idTipoMensaje: 2, mensaje: 'ok' } });
       case '/parametros/get_param_by_id_maestro': {
         const grp = url.searchParams.get('grp_id_maestro');
         if (grp === '23')

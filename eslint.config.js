@@ -65,6 +65,6 @@ export default tseslint.config(
   {
     files: ['**/*.test.{ts,tsx}', 'e2e/**', '*.config.ts', 'deploy/**'],
     languageOptions: { globals: { ...globals.node } },
-    rules: { 'security/detect-non-literal-fs-filename': 'off', '@typescript-eslint/no-non-null-assertion': 'off', 'no-restricted-globals': 'off' },
+    rules: { 'security/detect-non-literal-fs-filename': 'off', '@typescript-eslint/no-non-null-assertion': 'off', 'no-restricted-globals': 'off', 'security/detect-non-literal-regexp': 'off' },
   },
 );

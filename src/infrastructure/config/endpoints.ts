@@ -13,6 +13,20 @@ export const endpoints = {
     /** { usuario, clave_acceso, ref } → { token }. 401 = credenciales o empresa inválidas. */
     login: '/auth/login',
     logout: '/auth/logout',
+    /** Empresas/áreas del usuario (del JWT). */
+    areas: '/auth/company-areas',
+  },
+  chats: {
+    listar: '/chats/get_chats',
+    porId: (id: number) => `/chats/${encodeURIComponent(String(Math.trunc(id)))}`,
+    /** Paginado con ?last_evaluated_key=<JSON>. */
+    mensajes: '/messages/chat',
+    urlsAdjuntos: '/messages/attachment-upload-urls',
+  },
+  rag: {
+    chat: '/rag/chat-streaming',
+    /** Con imágenes adjuntas (VLM). */
+    vlm: '/rag/vlm-streaming',
   },
   parametros: {
     /** Maestro de maestros por grupo (GRP_ID_MAESTRO). Requiere Bearer. */

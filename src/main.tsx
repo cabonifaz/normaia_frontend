@@ -5,6 +5,7 @@ import { App } from '@/ui/app/App';
 import { createQueryClient } from '@/ui/app/queryClient';
 import { createAppRouter } from '@/ui/app/router';
 import '@/ui/styles/design.css';
+import '@/ui/styles/chat.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('No se encontró #root');

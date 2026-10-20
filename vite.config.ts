@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   // Con base relativa (/api/v1) el API es del mismo origen: connect-src 'self' basta.
   const base = env.VITE_API_BASE_URL ?? '';
   const apiOrigin = /^https?:\/\//.test(base) ? new URL(base).origin : '';
+  const attachmentsOrigin = env.VITE_ATTACHMENTS_ORIGIN ? new URL(env.VITE_ATTACHMENTS_ORIGIN).origin : '';
   // Solo desarrollo: reverse proxy hacia el backend real (evita CORS sin abrirlo en el servidor).
   const proxyTarget = env.VITE_API_PROXY_TARGET;
 
@@ -25,7 +26,7 @@ export default defineConfig(({ mode }) => {
       watch: { ignored: ['**/playwright-report/**', '**/test-results/**'] },
       ...(proxyTarget ? { proxy: { '/api': { target: proxyTarget, changeOrigin: true, secure: true } } } : {}),
     },
-    preview: { port: 4173, strictPort: true, headers: securityHeaders(apiOrigin) },
+    preview: { port: 4173, strictPort: true, headers: securityHeaders(apiOrigin, attachmentsOrigin) },
     build: {
       target: 'es2022',
       sourcemap: false,

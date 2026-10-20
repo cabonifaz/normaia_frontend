@@ -6,6 +6,7 @@ import { RecoverPage } from '@/ui/auth/RecoverPage';
 import { LandingPage } from '@/ui/landing/LandingPage';
 import { PendingPage } from '@/ui/pages/PendingPage';
 import { RegisterPage } from '@/ui/registro/RegisterPage';
+import { ChatPage } from '@/ui/chat/ChatPage';
 
 interface RouterContext {
   deps: AppDependencies;
@@ -44,7 +45,7 @@ export const routeTree = rootRoute.addChildren([
     beforeLoad: ({ context }) => {
       if (!context.deps.auth.haySesion()) throw redirect({ to: '/ingresar', search: { motivo: 'sesion-requerida' }, replace: true });
     },
-    component: () => <PendingPage title="Norma IA" description="Consulta RAG pendiente de diseño y contrato del backend." />,
+    component: ChatPage,
   }),
   pending('/terminos', 'Términos y condiciones', 'Texto legal pendiente.'),
   pending('/privacidad', 'Política de privacidad', 'Texto legal pendiente.'),

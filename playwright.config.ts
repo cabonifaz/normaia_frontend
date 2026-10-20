@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { E2E_API, E2E_KID, e2eKeys } from './e2e/keys';
+import { E2E_API, E2E_ATTACHMENTS, E2E_KID, e2eKeys } from './e2e/keys';
 
 const { publicPem } = e2eKeys();
 
@@ -34,6 +34,7 @@ export default defineConfig({
       VITE_USE_MOCKS: 'false',
       VITE_COMPANY_REF: 'e2e-company-ref',
       VITE_API_PROXY_TARGET: '',
+      VITE_ATTACHMENTS_ORIGIN: E2E_ATTACHMENTS,
     },
   },
 });

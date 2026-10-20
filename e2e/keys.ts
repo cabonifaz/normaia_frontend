@@ -18,4 +18,6 @@ export function e2eKeys(): { publicPem: string; privatePem: string } {
 }
 
 export const E2E_API = 'https://api.normaia.test/api/v1';
+/** Bucket simulado de adjuntos (presigned PUT + imágenes del historial). */
+export const E2E_ATTACHMENTS = 'https://norma-adjuntos.s3.us-east-1.amazonaws.com';
 export const E2E_KID = 'e2e-2026-10';

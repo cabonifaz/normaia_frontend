@@ -119,3 +119,68 @@ export function createHttpClient(config: HttpClientConfig, hooks: { onUnauthoriz
     return parsed.data;
   };
 }
+
+export interface StreamRequest {
+  body: unknown;
+  bearer: string | null;
+  signal: AbortSignal;
+}
+
+export type StreamOpener = (path: string, req: StreamRequest) => Promise<{ body: ReadableStream<Uint8Array>; requestId: string }>;
+
+/**
+ * Abre un POST con respuesta text/event-stream, con las mismas garantías que `request`
+ * (ruta segura, X-Request-Id, CSRF, sin redirecciones, errores normalizados).
+ * Sin timeout total: la duración la controla el lector SSE con su timeout por inactividad.
+ */
+export function createStreamOpener(config: HttpClientConfig, hooks: { onUnauthorized?: () => void } = {}): StreamOpener {
+  const baseUrl = config.baseUrl.replace(/\/+$/, '');
+  return async (path, req) => {
+    assertSafePath(path);
+    const requestId = crypto.randomUUID();
+    const headers = new Headers({
+      Accept: 'text/event-stream',
+      'Content-Type': 'application/json',
+      'X-Request-Id': requestId,
+      'Idempotency-Key': crypto.randomUUID(),
+    });
+    if (req.bearer) headers.set('Authorization', `Bearer ${req.bearer}`);
+    const csrf = readCsrfToken();
+    if (csrf) headers.set(CSRF_HEADER, csrf);
+
+    // El arranque sí tiene timeout: si el servidor no responde cabeceras, no esperar indefinidamente.
+    const connectTimeout = AbortSignal.timeout(config.timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(baseUrl + path, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(req.body),
+        signal: AbortSignal.any([req.signal, connectTimeout]),
+        credentials: 'include',
+        mode: 'cors',
+        cache: 'no-store',
+        redirect: 'error',
+        referrerPolicy: 'no-referrer',
+      });
+    } catch {
+      if (req.signal.aborted) throw new AppError('aborted', 0, requestId);
+      if (connectTimeout.aborted) throw new AppError('timeout', 0, requestId);
+      throw new AppError('network', 0, requestId);
+    }
+
+    if (!res.ok || !res.body) {
+      const payload = await readJson(res);
+      const kind = kindFromStatus(res.status);
+      if (kind === 'unauthorized') hooks.onUnauthorized?.();
+      const retry = Number(res.headers.get('retry-after'));
+      throw new AppError(kind, res.status, requestId, extractErrorCode(payload), Number.isFinite(retry) && retry > 0 ? retry : null);
+    }
+    const type = (res.headers.get('content-type') ?? '').toLowerCase();
+    if (!type.startsWith('text/event-stream')) {
+      void res.body.cancel();
+      throw new AppError('contract', res.status, requestId);
+    }
+    return { body: res.body, requestId };
+  };
+}
